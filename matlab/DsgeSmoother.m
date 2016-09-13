@@ -1,4 +1,4 @@
-function [alphahat,etahat,epsilonhat,ahat,SteadyState,trend_coeff,aK,T,R,P,PK,decomp,trend_addition] = DsgeSmoother(xparam1,gend,Y,data_index,missing_value)
+function [alphahat,etahat,epsilonhat,ahat,SteadyState,trend_coeff,aK,T,R,P,PK,decomp,trend_addition] = DsgeSmoother(xparam1,gend,Y,data_index,missing_value,varargin)
 % Estimation of the smoothed variables and innovations. 
 % 
 % INPUTS 
@@ -273,11 +273,11 @@ if kalman_algo == 2 || kalman_algo == 4
             end
         end
         
-    [alphahat,epsilonhat,etahat,ahat,P,aK,PK,decomp] = missing_DiffuseKalmanSmootherH3_Z(ST, ...
+   [alphahat,epsilonhat,etahat,ahat,P,aK,PK,decomp] = missing_DiffuseKalmanSmootherH3_Z(ST, ...
                                                       Z,R1,Q,diag(H), ...
                                                       Pinf,Pstar,data1,vobs,np,smpl,data_index, ...
                                                       options_.nk,kalman_tol,diffuse_kalman_tol, ...
-                                                      options_.filter_decomposition);
+                                                      options_.filter_decomposition,varargin{:});
 end
 
 

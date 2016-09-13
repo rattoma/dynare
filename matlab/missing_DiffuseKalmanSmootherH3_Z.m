@@ -1,4 +1,4 @@
-function [alphahat,epsilonhat,etahat,a,P,aK,PK,decomp] = missing_DiffuseKalmanSmootherH3_Z(T,Z,R,Q,H,Pinf1,Pstar1,Y,pp,mm,smpl,data_index,nk,kalman_tol,diffuse_kalman_tol,decomp_flag)
+function [alphahat,epsilonhat,etahat,a,P,aK,PK,decomp] = missing_DiffuseKalmanSmootherH3_Z(T,Z,R,Q,H,Pinf1,Pstar1,Y,pp,mm,smpl,data_index,nk,kalman_tol,diffuse_kalman_tol,decomp_flag,varargin)
 % function [alphahat,epsilonhat,etahat,a1,P,aK,PK,d,decomp] = missing_DiffuseKalmanSmootherH3_Z(T,Z,R,Q,H,Pinf1,Pstar1,Y,pp,mm,smpl,data_index,nk,kalman_tol,decomp_flag)
 % Computes the diffuse kalman smoother in the case of a singular var-cov matrix.
 % Univariate treatment of multivariate time series.
@@ -8,7 +8,7 @@ function [alphahat,epsilonhat,etahat,a,P,aK,PK,decomp] = missing_DiffuseKalmanSm
 %    Z:        pp*mm matrix     selector matrix for observables in augmented state vector
 %    R:        mm*rr matrix     second matrix of the state equation relating the structural innovations to the state variables
 %    Q:        rr*rr matrix     covariance matrix of structural errors
-%    H:        pp*1             vector of variance of measurement errors
+%    H:        pp*1  vector of variance of measurement errors
 %    Pinf1:    mm*mm diagonal matrix with with q ones and m-q zeros
 %    Pstar1:   mm*mm variance-covariance matrix with stationary variables
 %    Y:        pp*1 vector
@@ -77,7 +77,7 @@ spstar          = size(Pstar1);
 v               = zeros(pp,smpl);
 a               = zeros(mm,smpl);
 a1              = zeros(mm,smpl+1);
-aK              = zeros(nk,mm,smpl+nk);
+aK          = zeros(nk,mm,smpl+nk);
 
 Fstar           = zeros(pp,smpl);
 Finf            = zeros(pp,smpl);
@@ -99,6 +99,24 @@ alphahat        = zeros(mm,smpl);
 etahat          = zeros(rr,smpl);
 epsilonhat      = zeros(rr,smpl);
 r               = zeros(mm,smpl);
+
+% load infox
+if length(varargin)==4,
+%     TT = zeros(mm,mm,smpl);
+%     RR = zeros(mm,rr,smpl);
+    TT=varargin{1};
+    RR=varargin{2};
+    CC=varargin{3};
+    occbin_options=varargin{4};
+    
+    TT = cat(3,TT,T);
+    RR = cat(3,RR,R);
+    CC = cat(2,CC,zeros(mm,1));
+    isoccbin = 1;
+else
+    isoccbin = 0;
+    C=0;
+end
 
 t = 0;
 icc=0;
@@ -135,6 +153,10 @@ while newRank && t < smpl
     else
         oldRank = 0;
     end
+    if isoccbin,
+        TT(:,:,t+1)=  T;
+        RR(:,:,t+1)=  R;
+    end
     a1(:,t+1) = T*a(:,t);
     aK(1,:,t+1) = a1(:,t+1); 
     for jnk=2:nk
@@ -148,6 +170,7 @@ while newRank && t < smpl
     end
     if oldRank ~= newRank
         disp('univariate_diffuse_kalman_filter:: T does influence the rank of Pinf!')   
+        newRank = newRank*(oldRank>0); %kill newRank if this is only the effect of T
     end
 end
 
@@ -177,7 +200,12 @@ while notsteady && t<smpl
             P(:,:,t) = P(:,:,t) - Ki(:,i,t)*Ki(:,i,t)'/Fi(i,t);
         end
     end
-    a1(:,t+1) = T*a(:,t);
+    if isoccbin,
+        QQ              = RR(:,:,t+1)*Q*transpose(RR(:,:,t+1));
+        T = TT(:,:,t+1);
+        C = CC(:,t+1);
+    end
+    a1(:,t+1) = T*a(:,t)+C;
     Pf          = P(:,:,t);
     aK(1,:,t+1) = a1(:,t+1); 
     for jnk=1:nk
@@ -233,6 +261,10 @@ while t > d+1
     end
     r(:,t) = ri;
     alphahat(:,t) = a1(:,t) + P1(:,:,t)*r(:,t);
+    if isoccbin,
+        QRt = Q*transpose(RR(:,:,t));
+        T = TT(:,:,t);
+    end
     etahat(:,t) = QRt*r(:,t);
     ri = T'*ri;
 end
@@ -254,12 +286,18 @@ if d
         end
         alphahat(:,t) = a1(:,t) + Pstar1(:,:,t)*r0(:,t) + Pinf1(:,:,t)*r1(:,t);
         r(:,t)        = r0(:,t);
+        if isoccbin,
+            QRt = Q*transpose(RR(:,:,t));
+            T = TT(:,:,t);
+        end
         etahat(:,t)   = QRt*r(:,t);
         if t > 1
             r0(:,t-1) = T'*r0(:,t);
             r1(:,t-1) = T'*r1(:,t);
         end
     end
+else   
+    alphahat0 = 0*a1(:,1) + P1(:,:,1)*ri;
 end
 
 if decomp_flag
@@ -283,6 +321,9 @@ if decomp_flag
             BBB = Ttok*AAA;
             for j=1:rr
                 decomp(h,:,j,t+h) = eta_tm1t(j)*BBB(:,j);
+            end
+            if isoccbin,
+                T = TT(:,:,t);
             end
             Ttok = T*Ttok;
         end
