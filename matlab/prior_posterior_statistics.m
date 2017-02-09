@@ -123,7 +123,7 @@ end
 
 varlist = options_.varlist;
 if isempty(varlist)
-    varlist = M_.endo_names(1:M_.orig_endo_nbr, :);
+    varlist = char(sort(cellstr(M_.endo_names(1:M_.orig_endo_nbr,:))));
 end
 nvar = size(varlist,1);
 SelecVariables = [];
@@ -203,11 +203,35 @@ localVars.ifil=ifil;
 localVars.DirectoryName = DirectoryName;
 
 if strcmpi(type,'posterior'),
+    BaseName = [DirectoryName filesep M_.fname];
+    load_last_mh_history_file(DirectoryName, M_.fname);
+    FirstMhFile = record.KeepedDraws.FirstMhFile;
+    FirstLine = record.KeepedDraws.FirstLine; 
+    TotalNumberOfMhFiles = sum(record.MhDraws(:,2)); 
+    LastMhFile = TotalNumberOfMhFiles; 
+    TotalNumberOfMhDraws = sum(record.MhDraws(:,1));
+    NumberOfDraws = TotalNumberOfMhDraws-floor(options_.mh_drop*TotalNumberOfMhDraws);
+    mh_nblck = options_.mh_nblck;
+    if B==NumberOfDraws*mh_nblck,
+        % we load all retained MH runs !
+        logpost=GetAllPosteriorDraws(0, FirstMhFile, FirstLine, TotalNumberOfMhFiles, NumberOfDraws);
+        for column=1:npar
+            x(:,column) = GetAllPosteriorDraws(column, FirstMhFile, FirstLine, TotalNumberOfMhFiles, NumberOfDraws);
+        end
+    else
+
     b=0;
     logpost=NaN(B,1);
-    while b<=B
+        while b<B
         b = b + 1;
-        [x(b,:), logpost(b,1)] = GetOneDraw(type);
+            [xtmp, ltmp] = GetOneDraw(type);
+            if ~ismember(ltmp,logpost(1:b-1))
+                x(b,:)=xtmp;
+                logpost(b,1) = ltmp;
+            else
+                b=b-1;
+            end
+        end
     end
     localVars.logpost=logpost;
 end
@@ -274,8 +298,13 @@ else
     % which files have to be copied to run remotely
     NamFileInput(1,:) = {'',[M_.fname '_static.m']};
     NamFileInput(2,:) = {'',[M_.fname '_dynamic.m']};
+    NamFileInput(3,:) = {'',[M_.fname '_set_auxiliary_variables.m']};
     if options_.steadystate_flag,
-        NamFileInput(length(NamFileInput)+1,:)={'',[M_.fname '_steadystate.m']};
+        if options_.steadystate_flag == 1,
+            NamFileInput(length(NamFileInput)+1,:)={'',[M_.fname '_steadystate.m']};
+        else
+            NamFileInput(length(NamFileInput)+1,:)={'',[M_.fname '_steadystate2.m']};
+        end
     end
     [fout] = masterParallel(options_.parallel, 1, B,NamFileInput,'prior_posterior_statistics_core', localVars,globalVars, options_.parallel_info);
 
@@ -300,19 +329,19 @@ end
 
 if options_.smoother
     pm3(endo_nbr,gend,ifil(1),B,'Smoothed variables',...
-        '',M_.endo_names(1:M_.orig_endo_nbr, :),M_.endo_names_tex,M_.endo_names,...
+        '',varlist,M_.endo_names_tex,M_.endo_names,...
         varlist,'SmoothedVariables',DirectoryName,'_smooth');
     pm3(exo_nbr,gend,ifil(2),B,'Smoothed shocks',...
         '',M_.exo_names,M_.exo_names_tex,M_.exo_names,...
         M_.exo_names,'SmoothedShocks',DirectoryName,'_inno');
     pm3(endo_nbr,1,ifil(9),B,'Trend_coefficients',...
-    '',M_.endo_names(1:M_.orig_endo_nbr,:),M_.endo_names_tex,M_.endo_names,...
+    '',varlist,M_.endo_names_tex,M_.endo_names,...
         varlist,'TrendCoeff',DirectoryName,'_trend_coeff');
     pm3(endo_nbr,gend,ifil(10),B,'Smoothed constant',...
-        '',M_.endo_names(1:M_.orig_endo_nbr, :),M_.endo_names_tex,M_.endo_names,...
+        '',varlist,M_.endo_names_tex,M_.endo_names,...
         varlist,'Constant',DirectoryName,'_smoothed_constant');
     pm3(endo_nbr,gend,ifil(11),B,'Smoothed trend',...
-        '',M_.endo_names(1:M_.orig_endo_nbr, :),M_.endo_names_tex,M_.endo_names,...
+        '',varlist,M_.endo_names_tex,M_.endo_names,...
         varlist,'Trend',DirectoryName,'_smoothed_trend');
     pm3(endo_nbr,gend,ifil(1),B,'Updated Variables',...
         '',varlist,M_.endo_names_tex,M_.endo_names,...
