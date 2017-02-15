@@ -53,7 +53,7 @@ function [oo_,options_,bayestopt_,Smoothed_variables_declaration_order_deviation
 % You should have received a copy of the GNU General Public License
 % along with Dynare.  If not, see <http://www.gnu.org/licenses/>.
 
-persistent dataset_ dataset_info
+persistent dataset_ dataset_info my_qz_criterium
 
 %store qz_criterium
 qz_criterium_old=options_.qz_criterium;
@@ -62,8 +62,12 @@ if ischar(parameters) && strcmp(parameters,'calibration')
     options_.smoother=1;
 end
 
-if isempty(dataset_) || isempty(bayestopt_)
+if isempty(dataset_) || isempty(bayestopt_) || (options_.nobs ~= dataset_.nobs)
     [dataset_,dataset_info,xparam1, hh, M_, options_, oo_, estim_params_,bayestopt_] = dynare_estimation_init(var_list, M_.fname, [], M_, options_, oo_, estim_params_, bayestopt_);
+    my_qz_criterium = options_.qz_criterium;
+else 
+% set the qz_criterium that was set in the last call to dynare_estimation_init
+    options_.qz_criterium = my_qz_criterium;
 end
 
 if nargin==0
