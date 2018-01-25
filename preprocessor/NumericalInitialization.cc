@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2016 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -213,12 +213,12 @@ InitValStatement::writeOutput(ostream &output, const string &basename, bool mini
 void
 InitValStatement::writeOutputPostInit(ostream &output) const
 {
-  output << "if M_.exo_nbr > 0;" << endl
-         << "\too_.exo_simul = [ones(M_.maximum_lag,1)*oo_.exo_steady_state'];" << endl
-         <<"end;" << endl
-         << "if M_.exo_det_nbr > 0;" << endl
-         << "\too_.exo_det_simul = [ones(M_.maximum_lag,1)*oo_.exo_det_steady_state'];" << endl
-         <<"end;" << endl;
+  output << "if M_.exo_nbr > 0" << endl
+         << "\too_.exo_simul = ones(M_.maximum_lag,1)*oo_.exo_steady_state';" << endl
+         <<"end" << endl
+         << "if M_.exo_det_nbr > 0" << endl
+         << "\too_.exo_det_simul = ones(M_.maximum_lag,1)*oo_.exo_det_steady_state';" << endl
+         <<"end" << endl;
 }
 
 EndValStatement::EndValStatement(const init_values_t &init_values_arg,
@@ -268,9 +268,11 @@ EndValStatement::writeOutput(ostream &output, const string &basename, bool minim
 }
 
 HistValStatement::HistValStatement(const hist_values_t &hist_values_arg,
+                                   const hist_vals_wrong_lag_t hist_vals_wrong_lag_arg,
                                    const SymbolTable &symbol_table_arg,
                                    const bool &all_values_required_arg) :
   hist_values(hist_values_arg),
+  hist_vals_wrong_lag(hist_vals_wrong_lag_arg),
   symbol_table(symbol_table_arg),
   all_values_required(all_values_required_arg)
 {
@@ -279,8 +281,6 @@ HistValStatement::HistValStatement(const hist_values_t &hist_values_arg,
 void
 HistValStatement::checkPass(ModFileStructure &mod_file_struct, WarningConsolidation &warnings)
 {
-  mod_file_struct.histval_present = true;
-
   if (all_values_required)
     {
       set<int> unused_endo = symbol_table.getEndogenous();
@@ -318,6 +318,7 @@ HistValStatement::checkPass(ModFileStructure &mod_file_struct, WarningConsolidat
       if (unused_endo.size() > 0 || unused_exo.size() > 0)
         exit(EXIT_FAILURE);
     }
+  mod_file_struct.hist_vals_wrong_lag = hist_vals_wrong_lag;
 }
 
 void

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 Dynare Team
+ * Copyright (C) 2008-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -31,8 +31,8 @@ main2(stringstream &in, string &basename, bool debug, bool clear_all, bool clear
       WarningConsolidation &warnings, bool nostrict, bool check_model_changes,
       bool minimal_workspace, bool compute_xrefs, FileOutputType output_mode,
       LanguageOutputType language, int params_derivs_order
-#if defined(_WIN32) || defined(__CYGWIN32__)
-      , bool cygwin, bool msvc
+#if defined(_WIN32) || defined(__CYGWIN32__) || defined(__MINGW32__)
+      , bool cygwin, bool msvc, bool mingw
 #endif
       )
 {
@@ -42,16 +42,16 @@ main2(stringstream &in, string &basename, bool debug, bool clear_all, bool clear
   ModFile *mod_file = p.parse(in, debug);
 
   // Run checking pass
-  mod_file->checkPass();
+  mod_file->checkPass(nostrict);
 
   // Perform transformations on the model (creation of auxiliary vars and equations)
-  mod_file->transformPass(nostrict);
+  mod_file->transformPass(nostrict, compute_xrefs);
 
   // Evaluate parameters initialization, initval, endval and pounds
   mod_file->evalAllExpressions(warn_uninit);
 
   // Do computations
-  mod_file->computingPass(no_tmp_terms, output_mode, compute_xrefs, params_derivs_order);
+  mod_file->computingPass(no_tmp_terms, output_mode, params_derivs_order);
 
   // Write outputs
   if (output_mode != none)
@@ -59,10 +59,10 @@ main2(stringstream &in, string &basename, bool debug, bool clear_all, bool clear
   else
     mod_file->writeOutputFiles(basename, clear_all, clear_global, no_log, no_warn, console, nograph,
                                nointeractive, config_file, check_model_changes, minimal_workspace, compute_xrefs
-#if defined(_WIN32) || defined(__CYGWIN32__)
-			       , cygwin, msvc
+#if defined(_WIN32) || defined(__CYGWIN32__) || defined(__MINGW32__)
+                               , cygwin, msvc, mingw
 #endif
-			       );
+                               );
 
   delete mod_file;
 

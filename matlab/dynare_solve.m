@@ -17,7 +17,7 @@ function [x,info,fvec,fjac] = dynare_solve(func,x,options,varargin)
 % SPECIAL REQUIREMENTS
 %    none
 
-% Copyright (C) 2001-2015 Dynare Team
+% Copyright (C) 2001-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -40,13 +40,19 @@ jacobian_flag = options.jacobian_flag;
 
 % Set tolerance parameter depending the the caller function.
 stack = dbstack;
-if strcmp(stack(2).file,'simulation_core.m') || strcmp(stack(2).file,'solve_stacked_problem.m')
+if isoctave
+    [pathstr,name,ext]=fileparts(stack(2).file);
+    caller_file_name=[name,ext];
+else
+    caller_file_name=stack(2).file;
+end
+if strcmp(caller_file_name,'simulation_core.m') || strcmp(caller_file_name,'solve_stacked_problem.m')
     tolf = options.dynatol.f;
 else
     tolf = options.solve_tolf;
 end
 
-if strcmp(stack(2).file,'dyn_ramsey_static.m')
+if strcmp(caller_file_name,'dyn_ramsey_static.m')
     maxit = options.ramsey.maxit;
 else
     maxit = options.steady.maxit;
@@ -74,7 +80,7 @@ i = find(~isfinite(fvec));
 if ~isempty(i)
     info = 1;
     x = NaN(size(fvec));
-    return;
+    return
 end
 
 % this test doesn't check complementarity conditions and is not used for
@@ -93,7 +99,11 @@ if options.solve_algo == 0
     options4fsolve.MaxFunEvals = 50000;
     options4fsolve.MaxIter = maxit;
     options4fsolve.TolFun = tolf;
-    options4fsolve.Display = 'iter';
+    if options.debug==1
+        options4fsolve.Display = 'final';
+    else
+        options4fsolve.Display = 'off';
+    end
     if jacobian_flag
         options4fsolve.Jacobian = 'on';
     else
@@ -103,7 +113,7 @@ if options.solve_algo == 0
         [x,fval,exitval,output] = fsolve(func,x,options4fsolve,varargin{:});
     else
         % Under Octave, use a wrapper, since fsolve() does not have a 4th arg
-        if isstring(func)
+        if ischar(func)
             func2 = str2func(func);
         else
             func2 = func;
@@ -115,13 +125,13 @@ if options.solve_algo == 0
             [x,fval,exitval,output] = fsolve(func,x,options4fsolve);
         else
             exitval = 3;
-        end;
+        end
     end
 
     if exitval == 1
         info = 0;
     elseif exitval > 1
-        if isstring(func)
+        if ischar(func)
             func2 = str2func(func);
         else
             func2 = func;
@@ -131,19 +141,19 @@ if options.solve_algo == 0
         if max(abs(fvec)) >= tolf
             info = 1;
         else
-            info = 0;        
+            info = 0;
         end
     else
         info = 1;
     end
 elseif options.solve_algo == 1
-        [x,info]=solve1(func,x,1:nn,1:nn,jacobian_flag,options.gstep, ...
+    [x,info]=solve1(func,x,1:nn,1:nn,jacobian_flag,options.gstep, ...
                     tolf,options.solve_tolx, ...
                     maxit,options.debug,varargin{:});
 elseif options.solve_algo == 9
-        [x,info]=trust_region(func,x,1:nn,1:nn,jacobian_flag,options.gstep, ...
-                    tolf,options.solve_tolx, ...
-                    maxit,options.debug,varargin{:});
+    [x,info]=trust_region(func,x,1:nn,1:nn,jacobian_flag,options.gstep, ...
+                          tolf,options.solve_tolx, ...
+                          maxit,options.debug,varargin{:});
 elseif options.solve_algo == 2 || options.solve_algo == 4
 
     if options.solve_algo == 2
@@ -223,4 +233,3 @@ elseif options.solve_algo == 11
 else
     error('DYNARE_SOLVE: option solve_algo must be one of [0,1,2,3,4,9,10,11]')
 end
-

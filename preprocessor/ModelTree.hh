@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2016 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -100,13 +100,6 @@ protected:
   */
   first_derivatives_t residuals_params_derivatives;
 
-  //! Cross reference information
-  map<int, ExprNode::EquationInfo> xrefs;
-  map<int, set<int> > xref_param;
-  map<int, set<int> > xref_endo;
-  map<int, set<int> > xref_exo;
-  map<int, set<int> > xref_exo_det;
-
   //! Second derivatives of the residuals w.r. to parameters
   /*! First index is equation number, second and third indeces are parameters.
     Only non-null derivatives are stored in the map.
@@ -135,7 +128,6 @@ protected:
   */
   third_derivatives_t hessian_params_derivatives;
 
-
   //! Temporary terms for the static/dynamic file (those which will be noted Txxxx)
   temporary_terms_t temporary_terms;
   temporary_terms_t temporary_terms_res;
@@ -150,7 +142,6 @@ protected:
   temporary_terms_t params_derivs_temporary_terms_res2;
   temporary_terms_t params_derivs_temporary_terms_g12;
   temporary_terms_t params_derivs_temporary_terms_g2;
-
 
   //! Trend variables and their growth factors
   map<int, expr_t> trend_symbols_map;
@@ -184,13 +175,16 @@ protected:
   void computeTemporaryTerms(bool is_matlab);
   //! Computes temporary terms for the file containing parameters derivatives
   void computeParamsDerivativesTemporaryTerms();
-//! Writes temporary terms
+  //! Writes temporary terms
   void writeTemporaryTerms(const temporary_terms_t &tt, const temporary_terms_t &ttm1, ostream &output, ExprNodeOutputType output_type, deriv_node_temp_terms_t &tef_terms) const;
   //! Compiles temporary terms
   void compileTemporaryTerms(ostream &code_file, unsigned int &instruction_number, const temporary_terms_t &tt, map_idx_t map_idx, bool dynamic, bool steady_dynamic) const;
   //! Adds informations for simulation in a binary file
   void Write_Inf_To_Bin_File(const string &basename, int &u_count_int, bool &file_open, bool is_two_boundaries, int block_mfs) const;
-
+  //! Fixes output when there are more than 32 nested parens, Issue #1201
+  void fixNestedParenthesis(ostringstream &output, map<string, string> &tmp_paren_vars, bool &message_printed) const;
+  //! Tests if string contains more than 32 nested parens, Issue #1201
+  bool testNestedParenthesis(const string &str) const;
   //! Writes model local variables
   /*! No temporary term is used in the output, so that local parameters declarations can be safely put before temporary terms declaration in the output files */
   void writeModelLocalVariables(ostream &output, ExprNodeOutputType output_type, deriv_node_temp_terms_t &tef_terms) const;
@@ -200,7 +194,7 @@ protected:
   void compileModelEquations(ostream &code_file, unsigned int &instruction_number, const temporary_terms_t &tt, const map_idx_t &map_idx, bool dynamic, bool steady_dynamic) const;
 
   //! Writes LaTeX model file
-  void writeLatexModelFile(const string &basename, ExprNodeOutputType output_type) const;
+  void writeLatexModelFile(const string &basename, ExprNodeOutputType output_type, const bool write_equation_tags = false) const;
 
   //! Sparse matrix of double to store the values of the Jacobian
   /*! First index is equation number, second index is endogenous type specific ID */
@@ -237,14 +231,6 @@ protected:
 
   //! Try to normalized each unnormalized equation (matched endogenous variable only on the LHS)
   void computeNormalizedEquations(multimap<int, int> &endo2eqs) const;
-  //! Compute cross references
-  void computeXrefs();
-  //! Help computeXrefs to compute the reverse references (i.e. param->eqs, endo->eqs, etc)
-  void computeRevXref(map<int, set<int> > &xrefset, const set<int> &eiref, int eqn);
-  //! Write cross references
-  void writeXrefs(ostream &output) const;
-  //! Write reverse cross references
-  void writeRevXrefs(ostream &output, const map<int, set<int> > &xrefmap, const string &type) const;
   //! Evaluate the jacobian and suppress all the elements below the cutoff
   void evaluateAndReduceJacobian(const eval_context_t &eval_context, jacob_map_t &contemporaneous_jacobian, jacob_map_t &static_jacobian, dynamic_jacob_map_t &dynamic_jacobian, double cutoff, bool verbose);
   //! Search the equations and variables belonging to the prologue and the epilogue of the model
@@ -280,11 +266,12 @@ protected:
   virtual unsigned int getBlockMaxLag(int block_number) const = 0;
   //! Return the maximum lead in a block
   virtual unsigned int getBlockMaxLead(int block_number) const = 0;
-  inline void setBlockLeadLag(int block, int max_lag, int max_lead) 
-    {
-       block_lag_lead[block] = make_pair(max_lag, max_lead);
-    };
-  
+  inline void
+  setBlockLeadLag(int block, int max_lag, int max_lead)
+  {
+    block_lag_lead[block] = make_pair(max_lag, max_lead);
+  };
+
   //! Return the type of equation (equation_number) belonging to the block block_number
   virtual EquationType getBlockEquationType(int block_number, int equation_number) const = 0;
   //! Return true if the equation has been normalized

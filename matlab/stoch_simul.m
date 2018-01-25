@@ -1,6 +1,6 @@
 function info=stoch_simul(var_list)
 
-% Copyright (C) 2001-2016 Dynare Team
+% Copyright (C) 2001-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -36,6 +36,11 @@ if options_.order == 1
     options_.replic = 1;
 end
 
+if M_.hessian_eq_zero && options_.order~=1
+    options_.order = 1;
+    warning('stoch_simul: using order = 1 because Hessian is equal to zero');
+end
+
 if isempty(options_.qz_criterium)
     options_.qz_criterium = 1+1e-6;
 end
@@ -56,7 +61,8 @@ if size(var_list,1) == 0
     var_list = M_.endo_names(1:M_.orig_endo_nbr, :);
 end
 
-[i_var,nvar] = varlist_indices(var_list,M_.endo_names);
+[i_var,nvar,index_uniques] = varlist_indices(var_list,M_.endo_names);
+var_list=var_list(index_uniques,:);
 
 iter_ = max(options_.periods,1);
 if M_.exo_nbr > 0
@@ -83,7 +89,7 @@ else
     [oo_.dr,info,M_,options_,oo_] = resol(0,M_,options_,oo_);
 end
 
-if options_.loglinear && isfield(oo_.dr,'ys') && options_.logged_steady_state==0 %log steady state for correct display of decision rule    
+if options_.loglinear && isfield(oo_.dr,'ys') && options_.logged_steady_state==0 %log steady state for correct display of decision rule
     oo_.dr.ys=log_variable(1:M_.endo_nbr,oo_.dr.ys,M_);
     oo_.steady_state=log_variable(1:M_.endo_nbr,oo_.steady_state,M_);
     options_old.logged_steady_state = 1; %make sure option is preserved outside of stoch_simul
@@ -150,12 +156,16 @@ if options_.periods > 0 && ~PI_PCL_solver
     if isempty(M_.endo_histval)
         y0 = oo_.dr.ys;
     else
-        y0 = M_.endo_histval;
+        if options_.loglinear
+            y0 = log_variable(1:M_.endo_nbr,M_.endo_histval,M_);
+        else
+            y0 = M_.endo_histval;
+        end
     end
     [ys, oo_] = simult(y0,oo_.dr,M_,options_,oo_);
     oo_.endo_simul = ys;
     if ~options_.minimal_workspace
-      dyn2vec;
+        dyn2vec;
     end
 end
 
@@ -196,7 +206,7 @@ if options_.irf
             else
                 if options_.order>1 && options_.relative_irf % normalize shock to 0.01 before IRF generation for GIRFs; multiply with 100 later
                     y=irf(oo_.dr,cs(M_.exo_names_orig_ord,i)./cs(i,i)/100, options_.irf, options_.drop, ...
-                          options_.replic, options_.order);                
+                          options_.replic, options_.order);
                 else %for linear model, rescaling is done later
                     y=irf(oo_.dr,cs(M_.exo_names_orig_ord,i), options_.irf, options_.drop, ...
                           options_.replic, options_.order);
@@ -249,10 +259,10 @@ if options_.irf
                 if nbplt == 0
                 elseif nbplt == 1
                     if options_.relative_irf
-                        hh = dyn_figure(options_,'Name',['Relative response to' ...
+                        hh = dyn_figure(options_.nodisplay,'Name',['Relative response to' ...
                                             ' orthogonalized shock to ' tit(i,:)]);
                     else
-                        hh = dyn_figure(options_,'Name',['Orthogonalized shock to' ...
+                        hh = dyn_figure(options_.nodisplay,'Name',['Orthogonalized shock to' ...
                                             ' ' tit(i,:)]);
                     end
                     for j = 1:number_of_plots_to_draw
@@ -265,7 +275,7 @@ if options_.irf
                         remove_fractional_xticks;
                         title(deblank(mylist(j,:)),'Interpreter','none');
                     end
-                    dyn_saveas(hh,[M_.fname '_IRF_' deblank(tit(i,:))],options_);
+                    dyn_saveas(hh,[M_.fname '_IRF_' deblank(tit(i,:))],options_.nodisplay,options_.graph_format);
                     if TeX && any(strcmp('eps',cellstr(options_.graph_format)))
                         fprintf(fidTeX,'\\begin{figure}[H]\n');
                         for j = 1:number_of_plots_to_draw
@@ -273,7 +283,7 @@ if options_.irf
                         end
                         fprintf(fidTeX,'\\centering \n');
                         fprintf(fidTeX,'\\includegraphics[width=%2.2f\\textwidth]{%s_IRF_%s}\n',options_.figures.textwidth*min(j/nc,1),M_.fname,deblank(tit(i,:)));
-                        fprintf(fidTeX,'\\caption{Impulse response functions (orthogonalized shock to $%s$).}',titTeX(i,:));
+                        fprintf(fidTeX,'\\caption{Impulse response functions (orthogonalized shock to $%s$).}\n',titTeX(i,:));
                         fprintf(fidTeX,'\\label{Fig:IRF:%s}\n',deblank(tit(i,:)));
                         fprintf(fidTeX,'\\end{figure}\n');
                         fprintf(fidTeX,' \n');
@@ -281,10 +291,10 @@ if options_.irf
                 else
                     for fig = 1:nbplt-1
                         if options_.relative_irf
-                            hh = dyn_figure(options_,'Name',['Relative response to orthogonalized shock' ...
+                            hh = dyn_figure(options_.nodisplay,'Name',['Relative response to orthogonalized shock' ...
                                                 ' to ' tit(i,:) ' figure ' int2str(fig)]);
                         else
-                            hh = dyn_figure(options_,'Name',['Orthogonalized shock to ' tit(i,:) ...
+                            hh = dyn_figure(options_.nodisplay,'Name',['Orthogonalized shock to ' tit(i,:) ...
                                                 ' figure ' int2str(fig)]);
                         end
                         for plt = 1:nstar
@@ -297,7 +307,7 @@ if options_.irf
                             remove_fractional_xticks
                             title(deblank(mylist((fig-1)*nstar+plt,:)),'Interpreter','none');
                         end
-                        dyn_saveas(hh,[ M_.fname '_IRF_' deblank(tit(i,:)) int2str(fig)],options_);
+                        dyn_saveas(hh,[ M_.fname '_IRF_' deblank(tit(i,:)) int2str(fig)],options_.nodisplay,options_.graph_format);
                         if TeX && any(strcmp('eps',cellstr(options_.graph_format)))
                             fprintf(fidTeX,'\\begin{figure}[H]\n');
                             for j = 1:nstar
@@ -317,9 +327,9 @@ if options_.irf
                             fprintf(fidTeX,' \n');
                         end
                     end
-                    hh = dyn_figure(options_,'Name',['Orthogonalized shock to ' tit(i,:) ' figure ' int2str(nbplt) '.']);
+                    hh = dyn_figure(options_.nodisplay,'Name',['Orthogonalized shock to ' tit(i,:) ' figure ' int2str(nbplt) '.']);
                     m = 0;
-                    for plt = 1:number_of_plots_to_draw-(nbplt-1)*nstar;
+                    for plt = 1:number_of_plots_to_draw-(nbplt-1)*nstar
                         m = m+1;
                         subplot(lr,lc,m);
                         plot(1:options_.irf,transpose(irfs((nbplt-1)*nstar+plt,:)),'-k','linewidth',1);
@@ -330,7 +340,7 @@ if options_.irf
                         remove_fractional_xticks
                         title(deblank(mylist((nbplt-1)*nstar+plt,:)),'Interpreter','none');
                     end
-                    dyn_saveas(hh,[ M_.fname '_IRF_' deblank(tit(i,:)) int2str(nbplt) ],options_);
+                    dyn_saveas(hh,[ M_.fname '_IRF_' deblank(tit(i,:)) int2str(nbplt) ],options_.nodisplay,options_.graph_format);
                     if TeX && any(strcmp('eps',cellstr(options_.graph_format)))
                         fprintf(fidTeX,'\\begin{figure}[H]\n');
                         for j = 1:m

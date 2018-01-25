@@ -40,7 +40,7 @@ function mode_check(fun,x,hessian_mat,DynareDataset,DatasetInfo,DynareOptions,Mo
 %! @end deftypefn
 %@eod:
 
-% Copyright (C) 2003-2016 Dynare Team
+% Copyright (C) 2003-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -58,13 +58,13 @@ function mode_check(fun,x,hessian_mat,DynareDataset,DatasetInfo,DynareOptions,Mo
 % along with Dynare.  If not, see <http://www.gnu.org/licenses/>.
 
 TeX = DynareOptions.TeX;
-if ~isempty(hessian_mat);
+if ~isempty(hessian_mat)
     [ s_min, k ] = min(diag(hessian_mat));
 end
 
 fval = feval(fun,x,DynareDataset,DatasetInfo,DynareOptions,Model,EstimatedParameters,BayesInfo,BoundsInfo,DynareResults);
 
-if ~isempty(hessian_mat);
+if ~isempty(hessian_mat)
     skipline()
     disp('MODE CHECK')
     skipline()
@@ -85,18 +85,18 @@ if TeX && any(strcmp('eps',cellstr(DynareOptions.graph_format)))
 end
 
 ll = DynareOptions.mode_check.neighbourhood_size;
-if isinf(ll),
+if isinf(ll)
     DynareOptions.mode_check.symmetric_plots = 0;
 end
 
 mcheck = struct('cross',struct(),'emode',struct());
 
-for plt = 1:nbplt,
+for plt = 1:nbplt
     if TeX
         NAMES = [];
         TeXNAMES = [];
     end
-    hh = dyn_figure(DynareOptions,'Name','Mode check plots');
+    hh = dyn_figure(DynareOptions.nodisplay,'Name','Mode check plots');
     for k=1:min(nstar,length(x)-(plt-1)*nstar)
         subplot(nr,nc,k)
         kk = (plt-1)*nstar+k;
@@ -111,8 +111,23 @@ for plt = 1:nbplt,
             end
         end
         xx = x;
-        l1 = max(BoundsInfo.lb(kk),(1-sign(x(kk))*ll)*x(kk)); m1 = 0; %lower bound
-        l2 = min(BoundsInfo.ub(kk),(1+sign(x(kk))*ll)*x(kk)); %upper bound
+        if x(kk)~=0 || ~isinf(BoundsInfo.lb(kk)) || ~isinf(BoundsInfo.lb(kk))
+            l1 = max(BoundsInfo.lb(kk),(1-sign(x(kk))*ll)*x(kk)); m1 = 0; %lower bound
+            l2 = min(BoundsInfo.ub(kk),(1+sign(x(kk))*ll)*x(kk)); %upper bound
+        else
+            %size info for 0 parameter is missing, use prior standard
+            %deviation
+            upper_bound=BoundsInfo.lb(kk);
+            if isinf(upper_bound)
+                upper_bound=-1e-6*DynareOptions.huge_number;
+            end
+            lower_bound=BoundsInfo.ub(kk);
+            if isinf(lower_bound)
+                lower_bound=-1e-6*DynareOptions.huge_number;
+            end
+            l1 = max(lower_bound,-BayesInfo.p2(kk)); m1 = 0; %lower bound
+            l2 = min(upper_bound,BayesInfo.p2(kk)); %upper bound
+        end            
         binding_lower_bound=0;
         binding_upper_bound=0;
         if isequal(x(kk),BoundsInfo.lb(kk))
@@ -121,7 +136,7 @@ for plt = 1:nbplt,
         elseif isequal(x(kk),BoundsInfo.ub(kk))
             binding_upper_bound=1;
             bound_value=BoundsInfo.ub(kk);
-        end      
+        end
         if DynareOptions.mode_check.symmetric_plots && ~binding_lower_bound && ~binding_upper_bound
             if l2<(1+ll)*x(kk) %test whether upper bound is too small due to prior binding
                 l1 = x(kk) - (l2-x(kk)); %adjust lower bound to become closer
@@ -134,7 +149,7 @@ for plt = 1:nbplt,
         z1 = l1:((x(kk)-l1)/(DynareOptions.mode_check.number_of_points/2)):x(kk);
         z2 = x(kk):((l2-x(kk))/(DynareOptions.mode_check.number_of_points/2)):l2;
         z  = union(z1,z2);
-        if DynareOptions.mode_check.nolik==0,
+        if DynareOptions.mode_check.nolik==0
             y = zeros(length(z),2);
             dy = priordens(xx,BayesInfo.pshape,BayesInfo.p6,BayesInfo.p7,BayesInfo.p3,BayesInfo.p4);
         end
@@ -145,6 +160,9 @@ for plt = 1:nbplt,
                 y(i,1) = fval;
             else
                 y(i,1) = NaN;
+                if DynareOptions.debug
+                    fprintf('mode_check:: could not solve model for parameter %s at value %4.3f, error code: %u\n',name,z(i),info(1))
+                end
             end
             if DynareOptions.mode_check.nolik==0
                 lnprior = priordens(xx,BayesInfo.pshape,BayesInfo.p6,BayesInfo.p7,BayesInfo.p3,BayesInfo.p4);
@@ -171,7 +189,7 @@ for plt = 1:nbplt,
         hold off
         drawnow
     end
-    if DynareOptions.mode_check.nolik==0,
+    if DynareOptions.mode_check.nolik==0
         if isoctave
             axes('outerposition',[0.3 0.93 0.42 0.07],'box','on'),
         else
@@ -184,7 +202,7 @@ for plt = 1:nbplt,
         text(0.25,0.5,'log-post')
         text(0.69,0.5,'log-lik kernel')
     end
-    dyn_saveas(hh,[ Model.fname '_CheckPlots' int2str(plt) ],DynareOptions);
+    dyn_saveas(hh,[ Model.fname '_CheckPlots' int2str(plt) ],DynareOptions.nodisplay,DynareOptions.graph_format);
     if TeX && any(strcmp('eps',cellstr(DynareOptions.graph_format)))
         % TeX eps loader file
         fprintf(fidTeX,'\\begin{figure}[H]\n');
@@ -200,8 +218,8 @@ for plt = 1:nbplt,
     end
 end
 if TeX && any(strcmp('eps',cellstr(DynareOptions.graph_format)))
-        fclose(fidTeX);
+    fclose(fidTeX);
 end
 
 OutputDirectoryName = CheckPath('modecheck',Model.dname);
-save([OutputDirectoryName '/check_plot_data'],'mcheck');
+save([OutputDirectoryName '/check_plot_data.mat'],'mcheck');

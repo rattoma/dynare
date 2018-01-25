@@ -7,7 +7,7 @@ function pm3(n1,n2,ifil,B,tit1,tit2,tit3,tit_tex,names1,names2,name3,DirectoryNa
 %  n2           [scalar] size of second dimension of moment matrix
 %  ifil         [scalar] number of moment files to load
 %  B            [scalar] number of subdraws
-%  tit1         [string] Figure title 
+%  tit1         [string] Figure title
 %  tit2         [string] not used
 %  tit3         [string] Save name for figure
 %  tit_tex      [cell array] TeX-Names for Variables
@@ -24,7 +24,7 @@ function pm3(n1,n2,ifil,B,tit1,tit2,tit3,tit_tex,names1,names2,name3,DirectoryNa
 % See also the comment in posterior_sampler.m funtion.
 
 
-% Copyright (C) 2007-2016 Dynare Team
+% Copyright (C) 2007-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -60,10 +60,10 @@ else
     end
 end
 if options_.TeX
-    if isempty(tit_tex),
+    if isempty(tit_tex)
         tit_tex=names1;
     end
-        
+
     varlist_TeX = [];
     for i=1:nvar
         if i==1
@@ -85,12 +85,14 @@ fprintf(['Estimation::mcmc: ' tit1 '\n']);
 k = 0;
 filter_step_ahead_indicator=0;
 filter_covar_indicator=0;
+state_uncert_indicator=0;
 
 for file = 1:ifil
-    load([DirectoryName '/' M_.fname var_type int2str(file)]);
+    loaded_file=load([DirectoryName '/' M_.fname var_type int2str(file)]);
+    stock=loaded_file.stock;
     if strcmp(var_type,'_filter_step_ahead')
         if file==1 %on first run, initialize variable for storing filter_step_ahead
-            stock1_filter_step_ahead=NaN(n1,n2,B,length(options_.filter_step_ahead)); 
+            stock1_filter_step_ahead=NaN(n1,n2,B,length(options_.filter_step_ahead));
             stock1 = zeros(n1,n2,B);
         end
         filter_step_ahead_indicator=1;
@@ -117,6 +119,13 @@ for file = 1:ifil
         end
         k = k(end)+(1:size(stock,2));
         stock1(:,k) = stock;
+    elseif strcmp(var_type,'_state_uncert')
+        if file==1 %on first run, initialize variable for storing filter_step_ahead
+            stock1_state_uncert=NaN(n1,n2,size(stock,3),B);
+        end
+        state_uncert_indicator=1;
+        k = k(end)+(1:size(stock,4));
+        stock1_state_uncert(:,:,:,k) = stock;
     else
         if file==1 %on first run, initialize variable for storing filter_step_ahead
             stock1 = zeros(n1,n2,B);
@@ -137,8 +146,7 @@ if filter_step_ahead_indicator
     if options_.estimation.moments_posterior_density.indicator
         Density_filter_step_ahead = zeros(options_.estimation.moments_posterior_density.gridpoints,2,filter_steps,nvar,n2);
     end
-end
-if filter_covar_indicator
+elseif filter_covar_indicator
     draw_dimension=4;
     oo_.FilterCovariance.Mean = squeeze(mean(stock1_filter_covar,draw_dimension));
     oo_.FilterCovariance.Median = squeeze(median(stock1_filter_covar,draw_dimension));
@@ -158,6 +166,28 @@ if filter_covar_indicator
     oo_.FilterCovariance.post_deciles=post_deciles;
     oo_.FilterCovariance.HPDinf=squeeze(hpd_interval(:,:,:,1));
     oo_.FilterCovariance.HPDsup=squeeze(hpd_interval(:,:,:,2));
+    fprintf(['Estimation::mcmc: ' tit1 ', done!\n']);
+    return
+elseif state_uncert_indicator
+    draw_dimension=4;
+    oo_.Smoother.State_uncertainty.Mean = squeeze(mean(stock1_state_uncert,draw_dimension));
+    oo_.Smoother.State_uncertainty.Median = squeeze(median(stock1_state_uncert,draw_dimension));
+    oo_.Smoother.State_uncertainty.var = squeeze(var(stock1_state_uncert,0,draw_dimension));
+    if size(stock1_state_uncert,draw_dimension)>2
+        hpd_interval = quantile(stock1_state_uncert,[(1-options_.mh_conf_sig)/2 (1-options_.mh_conf_sig)/2+options_.mh_conf_sig],draw_dimension);
+    else
+        size_matrix=size(stock1_state_uncert);
+        hpd_interval=NaN([size_matrix(1:3),2]);
+    end
+    if size(stock1_state_uncert,draw_dimension)>9
+        post_deciles =quantile(stock1_state_uncert,[0.1:0.1:0.9],draw_dimension);
+    else
+        size_matrix=size(stock1_state_uncert);
+        post_deciles=NaN([size_matrix(1:3),9]);
+    end
+    oo_.Smoother.State_uncertainty.post_deciles=post_deciles;
+    oo_.Smoother.State_uncertainty.HPDinf=squeeze(hpd_interval(:,:,:,1));
+    oo_.Smoother.State_uncertainty.HPDsup=squeeze(hpd_interval(:,:,:,2));
     fprintf(['Estimation::mcmc: ' tit1 ', done!\n']);
     return
 end
@@ -259,110 +289,111 @@ if strcmp(var_type,'_trend_coeff') || max(max(abs(Mean(:,:))))<=10^(-6) || all(a
     return %not do plots
 end
 %%
-%% 	Finally I build the plots.
+%%      Finally I build the plots.
 %%
 
-% Block of code executed in parallel, with the exception of file
-% .tex generation always run sequentially. This portion of code is execute in parallel by
-% pm3_core1.m function.
+if ~options_.nograph && ~options_.no_graph.posterior
+    % Block of code executed in parallel, with the exception of file
+    % .tex generation always run sequentially. This portion of code is execute in parallel by
+    % pm3_core1.m function.
 
-% %%%%%%%%%   PARALLEL BLOCK % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% %%% The file .TeX! are not saved in parallel.
+    % %%%%%%%%%   PARALLEL BLOCK % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %
+    % %%% The file .TeX! are not saved in parallel.
 
 
 
-% Store the variable mandatory for local/remote parallel computing.
+    % Store the variable mandatory for local/remote parallel computing.
 
-localVars=[];
+    localVars=[];
 
-localVars.tit1=tit1;
-localVars.nn=nn;
-localVars.n2=n2;
-localVars.Distrib=Distrib;
-localVars.varlist=varlist;
-localVars.MaxNumberOfPlotsPerFigure=MaxNumberOfPlotsPerFigure;
-localVars.name3=name3;
-localVars.tit3=tit3;
-localVars.Mean=Mean;
-% Like sequential execution!
-nvar0=nvar;
+    localVars.tit1=tit1;
+    localVars.nn=nn;
+    localVars.n2=n2;
+    localVars.Distrib=Distrib;
+    localVars.varlist=varlist;
+    localVars.MaxNumberOfPlotsPerFigure=MaxNumberOfPlotsPerFigure;
+    localVars.name3=name3;
+    localVars.tit3=tit3;
+    localVars.Mean=Mean;
+    % Like sequential execution!
+    nvar0=nvar;
 
-if ~isoctave
-    % Commenting for testing!
-    if isnumeric(options_.parallel) || ceil(size(varlist,1)/MaxNumberOfPlotsPerFigure)<4,
-        fout = pm3_core(localVars,1,nvar,0);
-        
-        % Parallel execution!
-    else
-        isRemoteOctave = 0;
-        for indPC=1:length(options_.parallel),
-            isRemoteOctave = isRemoteOctave + (findstr(options_.parallel(indPC).MatlabOctavePath, 'octave'));
-        end
-        if isRemoteOctave
+    if ~isoctave
+        % Commenting for testing!
+        if isnumeric(options_.parallel) || ceil(size(varlist,1)/MaxNumberOfPlotsPerFigure)<4
             fout = pm3_core(localVars,1,nvar,0);
+
+            % Parallel execution!
         else
-            globalVars = struct('M_',M_, ...
-                'options_', options_, ...
-                'oo_', oo_);
-            [fout, nvar0, totCPU] = masterParallel(options_.parallel, 1, nvar, [],'pm3_core', localVars,globalVars, options_.parallel_info);
-        end
-    end
-else
-    % For the time being in Octave enviroment the pm3.m is executed only in
-    % serial modality, to avoid problem with the plots.
-    
-    fout = pm3_core(localVars,1,nvar,0);
-end
-
-subplotnum = 0;
-
-if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
-    fidTeX = fopen([M_.dname '/Output/' M_.fname '_' name3 '.tex'],'w');
-    fprintf(fidTeX,'%% TeX eps-loader file generated by Dynare.\n');
-    fprintf(fidTeX,['%% ' datestr(now,0) '\n']);
-    fprintf(fidTeX,' \n');
-    nvar0=cumsum(nvar0);
-
-    i=0;    
-    for j=1:length(nvar0),
-    
-    NAMES = [];
-    TEXNAMES = [];
-    nvar=nvar0(j);
-    while i<nvar,
-        i=i+1;
-        if max(abs(Mean(:,i))) > 10^(-6)
-            subplotnum = subplotnum+1;
-            name = deblank(varlist(i,:));
-            texname = deblank(varlist_TeX(i,:));
-            if subplotnum==1
-                NAMES = name;
-                TEXNAMES = ['$' texname '$'];
+            isRemoteOctave = 0;
+            for indPC=1:length(options_.parallel)
+                isRemoteOctave = isRemoteOctave + (findstr(options_.parallel(indPC).MatlabOctavePath, 'octave'));
+            end
+            if isRemoteOctave
+                fout = pm3_core(localVars,1,nvar,0);
             else
-                NAMES = char(NAMES,name);
-                TEXNAMES = char(TEXNAMES,['$' texname '$']);
+                globalVars = struct('M_',M_, ...
+                                    'options_', options_, ...
+                                    'oo_', oo_);
+                [fout, nvar0, totCPU] = masterParallel(options_.parallel, 1, nvar, [],'pm3_core', localVars,globalVars, options_.parallel_info);
             end
         end
-        if subplotnum == MaxNumberOfPlotsPerFigure || i == nvar
-            fprintf(fidTeX,'\\begin{figure}[H]\n');
-            for jj = 1:size(TEXNAMES,1)
-                fprintf(fidTeX,['\\psfrag{%s}[1][][0.5][0]{%s}\n'],deblank(NAMES(jj,:)),deblank(TEXNAMES(jj,:)));
-            end
-            fprintf(fidTeX,'\\centering \n');
-            fprintf(fidTeX,['\\includegraphics[width=%2.2f\\textwidth]{%s/Output/%s_' name3 '_%s}\n'],options_.figures.textwidth*min(subplotnum/nn,1),M_.dname,M_.fname,deblank(tit3(i,:)));
-            fprintf(fidTeX,'\\label{Fig:%s:%s}\n',name3,deblank(tit3(i,:)));
-            fprintf(fidTeX,'\\caption{%s}\n',tit1);
-            fprintf(fidTeX,'\\end{figure}\n');
-            fprintf(fidTeX,' \n');
-            subplotnum = 0;
+    else
+        % For the time being in Octave enviroment the pm3.m is executed only in
+        % serial modality, to avoid problem with the plots.
+
+        fout = pm3_core(localVars,1,nvar,0);
+    end
+
+    subplotnum = 0;
+
+    if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
+        fidTeX = fopen([M_.dname '/Output/' M_.fname '_' name3 '.tex'],'w');
+        fprintf(fidTeX,'%% TeX eps-loader file generated by Dynare.\n');
+        fprintf(fidTeX,['%% ' datestr(now,0) '\n']);
+        fprintf(fidTeX,' \n');
+        nvar0=cumsum(nvar0);
+
+        i=0;
+        for j=1:length(nvar0)
             NAMES = [];
             TEXNAMES = [];
+            nvar=nvar0(j);
+            while i<nvar
+                i=i+1;
+                if max(abs(Mean(:,i))) > 10^(-6)
+                    subplotnum = subplotnum+1;
+                    name = deblank(varlist(i,:));
+                    texname = deblank(varlist_TeX(i,:));
+                    if subplotnum==1
+                        NAMES = name;
+                        TEXNAMES = ['$' texname '$'];
+                    else
+                        NAMES = char(NAMES,name);
+                        TEXNAMES = char(TEXNAMES,['$' texname '$']);
+                    end
+                end
+                if subplotnum == MaxNumberOfPlotsPerFigure || i == nvar
+                    fprintf(fidTeX,'\\begin{figure}[H]\n');
+                    for jj = 1:size(TEXNAMES,1)
+                        fprintf(fidTeX,['\\psfrag{%s}[1][][0.5][0]{%s}\n'],deblank(NAMES(jj,:)),deblank(TEXNAMES(jj,:)));
+                    end
+                    fprintf(fidTeX,'\\centering \n');
+                    fprintf(fidTeX,['\\includegraphics[width=%2.2f\\textwidth]{%s/Output/%s_' name3 '_%s}\n'],options_.figures.textwidth*min(subplotnum/nn,1),M_.dname,M_.fname,deblank(tit3(i,:)));
+                    fprintf(fidTeX,'\\label{Fig:%s:%s}\n',name3,deblank(tit3(i,:)));
+                    fprintf(fidTeX,'\\caption{%s}\n',tit1);
+                    fprintf(fidTeX,'\\end{figure}\n');
+                    fprintf(fidTeX,' \n');
+                    subplotnum = 0;
+                    NAMES = [];
+                    TEXNAMES = [];
+                end
+            end
         end
+        fprintf(fidTeX,'%% End of TeX file.\n');
+        fclose(fidTeX);
     end
-    end
-    fprintf(fidTeX,'%% End of TeX file.\n');
-    fclose(fidTeX);
 end
 
 fprintf(['Estimation::mcmc: ' tit1 ', done!\n']);

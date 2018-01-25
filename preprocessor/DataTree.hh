@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2015 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -104,7 +104,8 @@ private:
 
 public:
   DataTree(SymbolTable &symbol_table_arg, NumericalConstants &num_constants_arg, ExternalFunctionsTable &external_functions_table_arg);
-  virtual ~DataTree();
+  virtual
+  ~DataTree();
 
   //! Some predefined constants
   expr_t Zero, One, Two, MinusOne, NaN, Infinity, MinusInfinity, Pi;
@@ -235,10 +236,14 @@ public:
   //! Returns the minimum lag (as a negative number) of the given symbol in the whole data tree (and not only in the equations !!)
   /*! Returns 0 if the symbol is not used */
   int minLagForSymbol(int symb_id) const;
-  //! Write the Header for getPowerDeriv when use_dll is used
+  //! Write the C Header for getPowerDeriv when use_dll is used
   void writePowerDerivCHeader(ostream &output) const;
-  //! Write getPowerDeriv
-  void writePowerDeriv(ostream &output, bool use_dll) const;
+  //! Write getPowerDeriv in C
+  void writePowerDeriv(ostream &output) const;
+  //! Write the C Header for normcdf when use_dll is used
+  void writeNormcdfCHeader(ostream &output) const;
+  //! Write normcdf in C
+  void writeNormcdf(ostream &output) const;
   //! Thrown when trying to access an unknown variable by deriv_id
   class UnknownDerivIDException
   {

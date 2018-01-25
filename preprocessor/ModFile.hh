@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2016 Dynare Team
+ * Copyright (C) 2006-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -41,7 +41,7 @@ using namespace std;
 
 // for checksum computation
 #ifndef PRIVATE_BUFFER_SIZE
-#define PRIVATE_BUFFER_SIZE 1024
+# define PRIVATE_BUFFER_SIZE 1024
 #endif
 
 //! The abstract representation of a "mod" file
@@ -66,6 +66,8 @@ public:
   DynamicModel trend_dynamic_model;
   //! A model in which to create the FOC for the ramsey problem
   DynamicModel ramsey_FOC_equations_dynamic_model;
+  //! A copy of the original model, used to test model linearity under ramsey problem
+  DynamicModel orig_ramsey_dynamic_model;
   //! Static model, as derived from the "model" block when leads and lags have been removed
   StaticModel static_model;
   //! Static model, as declared in the "steady_state_model" block if present
@@ -89,9 +91,9 @@ public:
   bool differentiate_forward_vars;
 
   /*! If the 'differentiate_forward_vars' option is used, contains the set of
-      endogenous with respect to which to do the transformation;
-      if empty, means that the transformation must be applied to all endos
-      with a lead */
+    endogenous with respect to which to do the transformation;
+    if empty, means that the transformation must be applied to all endos
+    with a lead */
   vector<string> differentiate_forward_vars_subset;
 
   //! Are nonstationary variables present ?
@@ -126,14 +128,14 @@ public:
   void evalAllExpressions(bool warn_uninit);
   //! Do some checking and fills mod_file_struct
   /*! \todo add check for number of equations and endogenous if ramsey_policy is present */
-  void checkPass();
+  void checkPass(bool nostrict);
   //! Perform some transformations on the model (creation of auxiliary vars and equations)
-  void transformPass(bool nostrict);
+  /*! \param compute_xrefs if true, equation cross references will be computed */
+  void transformPass(bool nostrict, bool compute_xrefs);
   //! Execute computations
   /*! \param no_tmp_terms if true, no temporary terms will be computed in the static and dynamic files */
-  /*! \param compute_xrefs if true, equation cross references will be computed */
   /*! \param params_derivs_order compute this order of derivs wrt parameters */
-  void computingPass(bool no_tmp_terms, FileOutputType output, bool compute_xrefs, int params_derivs_order);
+  void computingPass(bool no_tmp_terms, FileOutputType output, int params_derivs_order);
   //! Writes Matlab/Octave output files
   /*!
     \param basename The base name used for writing output files. Should be the name of the mod file without its extension
@@ -143,13 +145,14 @@ public:
     \param nointeractive Should Dynare request user input?
     \param cygwin Should the MEX command of use_dll be adapted for Cygwin?
     \param msvc Should the MEX command of use_dll be adapted for MSVC?
+    \param mingw Should the MEX command of use_dll be adapted for MinGW?
     \param compute_xrefs if true, equation cross references will be computed
   */
   void writeOutputFiles(const string &basename, bool clear_all, bool clear_global, bool no_log, bool no_warn,
                         bool console, bool nograph, bool nointeractive, const ConfigFile &config_file,
                         bool check_model_changes, bool minimal_workspace, bool compute_xrefs
-#if defined(_WIN32) || defined(__CYGWIN32__)
-                        , bool cygwin, bool msvc
+#if defined(_WIN32) || defined(__CYGWIN32__) || defined(__MINGW32__)
+                        , bool cygwin, bool msvc, bool mingw
 #endif
                         ) const;
   void writeExternalFiles(const string &basename, FileOutputType output, LanguageOutputType language) const;

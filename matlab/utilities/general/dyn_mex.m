@@ -1,21 +1,21 @@
 function dyn_mex(win_compiler,basename,force)
 
 % Compile Dynare model dlls when model option use_dll is used
-% if C file is fresher than mex file 
+% if C file is fresher than mex file
 %
 % INPUTS
-%  o win_compiler  str  compiler used under Windows (unused under Linux or OSX): 
+%  o win_compiler  str  compiler used under Windows (unused under Linux or OSX):
 %                       'msvc' (MS Visual C)
 %                        'cygwin'
 %  o basename      str  filenames base
-%  o force         bool recompile if 1 
-%  
-% OUTPUTS 
+%  o force         bool recompile if 1
+%
+% OUTPUTS
 %  none
 %
 
-    
-% Copyright (C) 2015-2016 Dynare Team
+
+% Copyright (C) 2015-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -47,61 +47,66 @@ end
 if ~exist('OCTAVE_VERSION')
     % Some mex commands are enclosed in an eval(), because otherwise it will make Octave fail
     if ispc
-      if strcmp(win_compiler,'msvc')
-          % MATLAB/Windows + Microsoft Visual C++
-          % Add /TP flag as fix for #1227
-          eval(['mex -O LINKFLAGS="$LINKFLAGS /export:Dynamic" COMPFLAGS="/TP" ' basename '_dynamic.c ' basename '_dynamic_mex.c'])
-          eval(['mex -O LINKFLAGS="$LINKFLAGS /export:Static" COMPFLAGS="/TP" ' basename '_static.c ' basename '_static_mex.c'])
-      elseif strcmp(win_compiler,'cygwin')
-          % MATLAB/Windows + Cygwin g++
-          eval(['mex -O PRELINK_CMDS1="echo EXPORTS > mex.def & echo ' ...
-                'mexFunction >> mex.def & echo Dynamic >> mex.def" ' ...
-                basename '_dynamic.c ' basename '_dynamic_mex.c'])
-          eval(['mex -O PRELINK_CMDS1="echo EXPORTS > mex.def & echo ' ...
-                'mexFunction >> mex.def & echo Dynamic >> mex.def" ' ...
-                basename '_static.c ' basename '_static_mex.c'])
-      else
-        error(['When using the USE_DLL option, you must give either ' ...
-               '''cygwin'' or ''msvc'' option to the ''dynare'' command'])
-      end
-    elseif isunix
+        if strcmp(win_compiler,'msvc')
+            % MATLAB/Windows + Microsoft Visual C++
+            % Add /TP flag as fix for #1227
+            eval(['mex -O LINKFLAGS="$LINKFLAGS /export:Dynamic" COMPFLAGS="/TP" ' basename '_dynamic.c ' basename '_dynamic_mex.c'])
+            eval(['mex -O LINKFLAGS="$LINKFLAGS /export:Static" COMPFLAGS="/TP" ' basename '_static.c ' basename '_static_mex.c'])
+        elseif strcmp(win_compiler,'mingw')
+            eval(['mex -O LINKFLAGS="$LINKFLAGS /export:Dynamic" ' basename '_dynamic.c ' basename '_dynamic_mex.c'])
+            eval(['mex -O LINKFLAGS="$LINKFLAGS /export:Static"  ' basename '_static.c ' basename '_static_mex.c'])
+        elseif strcmp(win_compiler,'cygwin') %legacy support for Cygwin with mexopts.bat
+                                             % MATLAB/Windows + Cygwin g++
+            eval(['mex -O PRELINK_CMDS1="echo EXPORTS > mex.def & echo ' ...
+                  'mexFunction >> mex.def & echo Dynamic >> mex.def" ' ...
+                  basename '_dynamic.c ' basename '_dynamic_mex.c'])
+            eval(['mex -O PRELINK_CMDS1="echo EXPORTS > mex.def & echo ' ...
+                  'mexFunction >> mex.def & echo Dynamic >> mex.def" ' ...
+                  basename '_static.c ' basename '_static_mex.c'])
+        else
+            error(['When using the USE_DLL option, you must give either ' ...
+                   '''cygwin'', ''mingw'' or ''msvc'' option to the ''dynare'' command'])
+        end
+    elseif isunix && ~ismac
         % MATLAB/Linux
         if matlab_ver_less_than('8.3')
             eval(['mex -O LDFLAGS=''-pthread -shared -Wl,--no-undefined'' ' ...
                   basename '_dynamic.c ' basename '_dynamic_mex.c'])
             eval(['mex -O LDFLAGS=''-pthread -shared -Wl,--no-undefined'' ' ...
                   basename '_static.c ' basename '_static_mex.c'])
-        else
+        elseif matlab_ver_less_than('9.1')
             eval(['mex -O LINKEXPORT='''' ' basename '_dynamic.c ' basename '_dynamic_mex.c'])
             eval(['mex -O LINKEXPORT='''' ' basename '_static.c ' basename '_static_mex.c'])
+        else
+            eval(['mex -O LINKEXPORTVER='''' ' basename '_dynamic.c ' basename '_dynamic_mex.c'])
+            eval(['mex -O LINKEXPORTVER='''' ' basename '_static.c ' basename '_static_mex.c'])
         end
     elseif ismac
         % MATLAB/MacOS
-        if matlab_ver_less_than('8.3')
-            if matlab_ver_less_than('8.1')
-                eval(['mex -O LDFLAGS=''-Wl,-twolevel_namespace -undefined ' ...
-                      'error -arch $ARCHS -Wl,-syslibroot,$SDKROOT ' ...
-                      '-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -bundle'' ' ...
-                      basename '_dynamic.c ' basename '_dynamic_mex.c'])
-                eval(['mex -O LDFLAGS=''-Wl,-twolevel_namespace -undefined ' ...
-                      'error -arch $ARCHS -Wl,-syslibroot,$SDKROOT ' ...
-                      '-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -bundle'' ' ...
-                      basename '_static.c ' basename '_static_mex.c'])
-            else
-                eval(['mex -O LDFLAGS=''-Wl,-twolevel_namespace -undefined ' ...
-                      'error -arch $ARCHS -Wl,-syslibroot,$MW_SDKROOT ' ...
-                      '-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -bundle'' ' ...
-                      basename '_dynamic.c ' basename '_dynamic_mex.c'])
-                eval(['mex -O LDFLAGS=''-Wl,-twolevel_namespace -undefined ' ...
-                      'error -arch $ARCHS -Wl,-syslibroot,$MW_SDKROOT ' ...
-                      '-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -bundle'' ' ...
-                      basename '_static.c ' basename '_static_mex.c'])
-            end
+        if matlab_ver_less_than('8.1')
+            eval(['mex -O LDFLAGS=''-Wl,-twolevel_namespace -undefined ' ...
+                  'error -arch $ARCHS -Wl,-syslibroot,$SDKROOT ' ...
+                  '-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -bundle'' ' ...
+                  basename '_dynamic.c ' basename '_dynamic_mex.c'])
+            eval(['mex -O LDFLAGS=''-Wl,-twolevel_namespace -undefined ' ...
+                  'error -arch $ARCHS -Wl,-syslibroot,$SDKROOT ' ...
+                  '-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -bundle'' ' ...
+                  basename '_static.c ' basename '_static_mex.c'])
+        elseif matlab_ver_less_than('8.3')
+            eval(['mex -O LDFLAGS=''-Wl,-twolevel_namespace -undefined ' ...
+                  'error -arch $ARCHS -Wl,-syslibroot,$MW_SDKROOT ' ...
+                  '-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -bundle'' ' ...
+                  basename '_dynamic.c ' basename '_dynamic_mex.c'])
+            eval(['mex -O LDFLAGS=''-Wl,-twolevel_namespace -undefined ' ...
+                  'error -arch $ARCHS -Wl,-syslibroot,$MW_SDKROOT ' ...
+                  '-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -bundle'' ' ...
+                  basename '_static.c ' basename '_static_mex.c'])
+        elseif matlab_ver_less_than('9.1')
+            eval(['mex -O LINKEXPORT='''' ' basename '_dynamic.c ' basename '_dynamic_mex.c'])
+            eval(['mex -O LINKEXPORT='''' ' basename '_static.c ' basename '_static_mex.c'])
         else
-            eval(['mex -O LINKEXPORT='''' ' basename '_dynamic.c ' ...
-                  basename '_dynamic_mex.c'])
-            eval(['mex -O LINKEXPORT='''' ' basename '_static.c ' basename ...
-                  '_static_mex.c'])
+            eval(['mex -O LINKEXPORT='''' LINKEXPORTVER='''' ' basename '_dynamic.c ' basename '_dynamic_mex.c'])
+            eval(['mex -O LINKEXPORT='''' LINKEXPORTVER='''' ' basename '_static.c ' basename '_static_mex.c'])
         end
     end
 else

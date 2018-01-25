@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 
-dnl Copyright (C) 2009-2016 Dynare Team
+dnl Copyright (C) 2009-2017 Dynare Team
 dnl
 dnl This file is part of Dynare.
 dnl
@@ -18,7 +18,7 @@ dnl You should have received a copy of the GNU General Public License
 dnl along with Dynare.  If not, see <http://www.gnu.org/licenses/>.
 
 AC_PREREQ([2.62])
-AC_INIT([dynare], [4.5-unstable])
+AC_INIT([dynare], [4.5.2])
 AC_CONFIG_SRCDIR([preprocessor/DynareMain.cc])
 AM_INIT_AUTOMAKE([1.11 -Wall -Wno-portability foreign no-dist-gzip dist-xz tar-pax])
 
@@ -86,10 +86,6 @@ CPPFLAGS="$CPPFLAGS_SAVED"
 # Don't use deprecated hash structures
 AC_DEFINE([BOOST_NO_HASH], [], [Don't use deprecated STL hash structures])
 
-# Check for dlopen(), needed by tests for estimation DLL
-AC_CHECK_LIB([dl], [dlopen], [LIBADD_DLOPEN="-ldl"], [])
-AC_SUBST([LIBADD_DLOPEN])
-
 # Check for libmatio, needed by Dynare++
 AX_MATIO
 AM_CONDITIONAL([HAVE_MATIO], [test "x$has_matio" = "xyes"])
@@ -116,9 +112,6 @@ AM_CONDITIONAL([HAVE_PDFLATEX], [test "x$PDFLATEX" != "x"])
 
 AC_CHECK_PROG([BIBTEX], [bibtex], [bibtex])
 AM_CONDITIONAL([HAVE_BIBTEX], [test "x$BIBTEX" != "x"])
-
-AC_CHECK_PROG([TEXI2HTML], [texi2html], [texi2html])
-AM_CONDITIONAL([HAVE_TEXI2HTML], [test "x$TEXI2HTML" != "x"])
 
 AC_CHECK_PROG([LATEX2HTML], [latex2html], [latex2html])
 AM_CONDITIONAL([HAVE_LATEX2HTML], [test "x$LATEX2HTML" != "x"])
@@ -172,6 +165,7 @@ esac
 AX_PTHREAD
 
 AC_CONFIG_FILES([Makefile
+                 VERSION
                  preprocessor/macro/Makefile
                  preprocessor/Makefile
                  doc/Makefile
@@ -202,10 +196,6 @@ AC_CONFIG_FILES([Makefile
                  dynare++/kord/Makefile
                  dynare++/src/Makefile
                  mex/sources/Makefile
-                 mex/sources/estimation/Makefile
-                 mex/sources/estimation/tests/Makefile
-                 mex/sources/estimation/libmat/Makefile
-                 mex/sources/estimation/libmat/tests/Makefile
 ])
 
 AC_ARG_ENABLE([matlab], AS_HELP_STRING([--disable-matlab], [disable compilation of MEX files for MATLAB]), [], [enable_matlab=yes])
@@ -281,10 +271,10 @@ fi
 
 if test "x$MAKEINFO" != "x"; then
   BUILD_DYNARE_INFO="yes"
-  if test "x$TEXI2HTML" != "x" -a "x$LATEX2HTML" != "x"; then
+  if test "x$LATEX2HTML" != "x"; then
     BUILD_DYNARE_HTML_MANUAL="yes"
   else
-    BUILD_DYNARE_HTML_MANUAL="yes (but with ugly math formulas, missing texi2html or latex2html)"
+    BUILD_DYNARE_HTML_MANUAL="yes (but with ugly math formulas, missing latex2html)"
   fi
   BUILD_DYNARE_PDF_MANUAL="yes"
 else

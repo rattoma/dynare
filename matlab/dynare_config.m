@@ -15,7 +15,7 @@ function dynareroot = dynare_config(path_to_dynare,verbose)
 % SPECIAL REQUIREMENTS
 %   none
 
-% Copyright (C) 2001-2016 Dynare Team
+% Copyright (C) 2001-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -58,6 +58,7 @@ p = {'/distributions/' ; ...
      '/particles/src' ; ...
      '/gsa/' ; ...
      '/ep/' ; ...
+     '/convergence_diagnostics/' ; ...
      '/cli/' ; ...
      '/lmmcp/' ; ...
      '/optimization/' ; ...
@@ -67,6 +68,7 @@ p = {'/distributions/' ; ...
      '/utilities/tests/src/' ; ...
      '/utilities/dataset/' ; ...
      '/utilities/general/' ; ...
+     '/utilities/graphics/' ; ...
      '/modules/reporting/src/' ; ...
      '/modules/reporting/macros/'};
 
@@ -90,6 +92,15 @@ if isoctave
     p{end+1} = '/missing/ordeig';
 end
 
+if isoctave && ~isequal(supported_octave_version(), version())
+    skipline()
+    warning(['This version of Octave is not supported. Consider installing ' ...
+             'version %s of Octave,\notherwise m files will be used instead ' ...
+             'of precompiled mex files and some features, like solution\n' ...
+             'of models approximated at third order, will not be available.'], supported_octave_version())
+    skipline()
+end
+
 % ilu is missing in Octave < 4.0
 if isoctave && octave_ver_less_than('4.0')
     p{end+1} = '/missing/ilu';
@@ -103,8 +114,18 @@ end
 % nanmean is in Octave Forge Statistics package and in MATLAB Statistics
 % toolbox
 if (isoctave && ~user_has_octave_forge_package('statistics')) ...
-    || (~isoctave && ~user_has_matlab_license('statistics_toolbox'))
+        || (~isoctave && ~user_has_matlab_license('statistics_toolbox'))
     p{end+1} = '/missing/nanmean';
+end
+
+% Check if struct2array is available.
+if ~exist('struct2array')
+    p{end+1} = '/missing/struct2array';
+end
+
+% isfile is missing in Octave and Matlab<R2017b
+if isoctave || matlab_ver_less_than('9.3')
+    p{end+1} = '/missing/isfile';
 end
 
 P = cellfun(@(c)[dynareroot(1:end-1) c], p, 'uni',false);

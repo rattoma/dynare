@@ -1,18 +1,18 @@
 function perfect_foresight_setup()
 % Prepares a deterministic simulation, by filling oo_.exo_simul and oo_.endo_simul
-%  
+%
 % INPUTS
 %   None
-%  
+%
 % OUTPUTS
 %   none
-%    
+%
 % ALGORITHM
-%   
+%
 % SPECIAL REQUIREMENTS
 %   none
 
-% Copyright (C) 1996-2016 Dynare Team
+% Copyright (C) 1996-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -35,20 +35,33 @@ test_for_deep_parameters_calibration(M_);
 
 if size(M_.lead_lag_incidence,2)-nnz(M_.lead_lag_incidence(M_.maximum_endo_lag+1,:)) > 0
     mess = ['PERFECT_FORESIGHT_SETUP: error in model specification : the variable(s) '];
-        var_list=M_.endo_names(find(M_.lead_lag_incidence(M_.maximum_lag+1,:)==0),:);
-        for i=1:size(var_list,1)
-            if i<size(var_list,1)
-                mess = [mess, deblank(var_list(i,:)) ', '];
-            else
-                mess = [mess, deblank(var_list(i,:)) ];
-            end
+    var_list=M_.endo_names(find(M_.lead_lag_incidence(M_.maximum_lag+1,:)==0),:);
+    for i=1:size(var_list,1)
+        if i<size(var_list,1)
+            mess = [mess, deblank(var_list(i,:)) ', '];
+        else
+            mess = [mess, deblank(var_list(i,:)) ];
         end
+    end
     mess = [mess ' don''t appear as current period variables.'];
     error(mess)
 end
 
 if options_.periods == 0
     error('PERFECT_FORESIGHT_SETUP: number of periods for the simulation isn''t specified')
+end
+
+if ~isempty(M_.det_shocks) && options_.periods<max([M_.det_shocks.periods])
+    % Some expected shocks happen after the terminal period.
+    mess = sprintf('Problem with the declaration of the expected shocks:\n');
+    for i=1:length(M_.det_shocks)
+        if any(M_.det_shocks(i).periods>options_.periods);
+            mess = sprintf('%s\n   At least one expected value for %s has been declared after the terminal period.', mess, deblank(M_.exo_names(M_.det_shocks(i).exo_id,:)));
+        end
+    end
+    disp(mess)
+    skipline()
+    error('PERFECT_FORESIGHT_SETUP: Please check the declaration of the shocks or increase the value of the periods option.')
 end
 
 if ~options_.initval_file

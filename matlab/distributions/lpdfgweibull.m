@@ -1,14 +1,14 @@
 function [ldens,Dldens,D2ldens] = lpdfgweibull(x,a,b,c)  % --*-- Unitary tests --*--
 
-% Evaluates the logged Weibull PDF at x. 
+% Evaluates the logged Weibull PDF at x.
 %
-% INPUTS 
+% INPUTS
 % - x       [double]  m*n matrix of points where the (logged) density will be evaluated,
 % - a       [double]  m*n matrix of First Weibull distribution parameters (shape parameter, k),
 % - b       [double]  m*n matrix of Second Weibull distribution parameters (scale parameter, λ),
 % - c       [double]  m*n matrix of Third Weibull distribution parameters (location parameter, default is 0).
 %
-% OUTPUTS 
+% OUTPUTS
 % - ldens   [double]  m*n matrix of logged (generalized) Weibull densities.
 % - Dldens  [double]  m*n matrix (first order derivatives w.r.t. x)
 % - D2ldens [double]  m*n matrix (second order derivatives w.r.t. x)
@@ -16,7 +16,7 @@ function [ldens,Dldens,D2ldens] = lpdfgweibull(x,a,b,c)  % --*-- Unitary tests -
 % SPECIAL REQUIREMENTS
 %    none
 
-% Copyright (C) 2015-2016 Dynare Team
+% Copyright (C) 2015-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -54,11 +54,11 @@ end
 if ~isscalar(x)
     if isscalar(a)
         a = repmat(a, size(x));
-    end 
+    end
     if isscalar(b)
         b = repmat(b, size(x));
     end
-    if isscalar(c) 
+    if isscalar(c)
         c = repmat(c, size(x));
     end
 end
@@ -77,7 +77,7 @@ if isempty(idx), return, end
 
 jdx = find( abs(a-1)<1e-12 & x>=c & (x-c)<1e-12) ;
 ldens(jdx) = 1.0;
-    
+
 if ~isempty(idx)
     x0 = x(idx)-c(idx);
     x1 = x0./b(idx);
@@ -136,7 +136,7 @@ end
 %$ catch
 %$    t(1) = false;
 %$ end
-%$ 
+%$
 %$ if t(1)
 %$    t(2) = isinf(a);
 %$ end
@@ -179,7 +179,7 @@ end
 %$ scale = 1;
 %$ shape = 2;
 %$ mode  = scale*((shape-1)/shape)^(1/shape);
-%$ 
+%$
 %$ try
 %$    [a, b, c] = lpdfgweibull(mode, shape, scale);
 %$    p = rand(1000,1)*4;
@@ -203,10 +203,10 @@ end
 %$ scale = 1;
 %$ shape = 2;
 %$ density  = @(x) exp(lpdfgweibull(x,shape,scale));
-%$ 
+%$
 %$ try
 %$    if isoctave
-%$        s = quadv(density, .0000000001, 100000);
+%$        s = quadv(density, .0000000001, 100000,1e-10);
 %$    else
 %$        s = integral(density, 0, 100000);
 %$    end
@@ -226,10 +226,10 @@ end
 %$ scale = 1;
 %$ shape = 1;
 %$ density  = @(x) exp(lpdfgweibull(x,shape,scale));
-%$ 
+%$
 %$ try
 %$    if isoctave
-%$        s = quadv(density, .0000000001, 100000);
+%$        s = quadv(density, .0000000001, 100000,1e-10);
 %$    else
 %$        s = integral(density, 0, 100000);
 %$    end
@@ -249,10 +249,10 @@ end
 %$ scale = 1;
 %$ shape = .5;
 %$ density  = @(x) exp(lpdfgweibull(x,shape,scale));
-%$ 
+%$
 %$ try
 %$    if isoctave
-%$        s = quadv(density, .0000000001, 100000);
+%$        s = quadv(density, .0000000001, 100000,1e-10)
 %$    else
 %$        s = integral(density, 0, 100000);
 %$    end
@@ -262,7 +262,11 @@ end
 %$ end
 %$
 %$ if t(1)
-%$    t(2) = abs(s-1)<1e-6;
+%$        if isoctave()
+%$            t(2) = abs(s-1)<5e-5;
+%$        else
+%$            t(2) = abs(s-1)<1e-6;
+%$        end
 %$ end
 %$
 %$ T = all(t);
@@ -272,10 +276,10 @@ end
 %$ scale = 1;
 %$ shape = 2;
 %$ xdens = @(x) x.*exp(lpdfgweibull(x,shape,scale));
-%$ 
+%$
 %$ try
 %$    if isoctave
-%$        s = quadv(xdens, .0000000001, 100000);
+%$        s = quadv(xdens, .0000000001, 20,1e-10)
 %$    else
 %$        s = integral(xdens, 0, 100000);
 %$    end
@@ -295,10 +299,10 @@ end
 %$ scale = 1;
 %$ shape = 1;
 %$ xdens = @(x) x.*exp(lpdfgweibull(x,shape,scale));
-%$ 
+%$
 %$ try
 %$    if isoctave
-%$        s = quadv(xdens, .0000000001, 100000);
+%$        s = quadv(xdens, .0000000001, 100000,1e-10)
 %$    else
 %$        s = integral(xdens, 0, 100000);
 %$    end
@@ -318,10 +322,10 @@ end
 %$ scale = 1;
 %$ shape = .5;
 %$ xdens = @(x) x.*exp(lpdfgweibull(x,shape,scale));
-%$ 
+%$
 %$ try
 %$    if isoctave
-%$        s = quadv(xdens, .0000000001, 100000);
+%$        s = quadv(xdens, .0000000001, 100000,1e-10)
 %$    else
 %$        s = integral(xdens, 0, 100000);
 %$    end
@@ -347,7 +351,7 @@ end
 %$    s = NaN(n, 1);
 %$    for i=1:n
 %$        if isoctave()
-%$            s(i) = quadv(density, .0000000001, .1*i);
+%$            s(i) = quadv(density, .0000000001, .1*i,1e-10)
 %$        else
 %$            s(i) = integral(density, 0, .1*i);
 %$        end
@@ -378,7 +382,7 @@ end
 %$    s = NaN(n, 1);
 %$    for i=1:n
 %$        if isoctave()
-%$            s(i) = quadv(density, .0000000001, .1*i);
+%$            s(i) = quadv(density, .0000000001, .1*i,1e-10)
 %$        else
 %$            s(i) = integral(density, 0, .1*i);
 %$        end
@@ -409,7 +413,7 @@ end
 %$    s = NaN(n, 1);
 %$    for i=1:n
 %$        if isoctave()
-%$            s(i) = quadv(density, .0000000001, .1*i);
+%$            s(i) = quadv(density, .0000000001, .1*i,1e-10)
 %$        else
 %$            s(i) = integral(density, 0, .1*i);
 %$        end
@@ -423,7 +427,11 @@ end
 %$    for i=1:n
 %$        x = .1*i;
 %$        q = 1-exp(-(x/scale)^shape);
-%$        t(i+1) = abs(s(i)-q)<1e-6;
+%$        if isoctave()
+%$            t(i+1) = abs(s(i)-q)<5e-5;
+%$        else
+%$            t(i+1) = abs(s(i)-q)<1e-6;
+%$        end
 %$    end
 %$ end
 %$

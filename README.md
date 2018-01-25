@@ -52,6 +52,7 @@ at the MATLAB prompt: if it returns `PCWIN`, then you have a 32-bit MATLAB; if i
 1. [**Debian or Ubuntu**](#debian-or-ubuntu)
 1. [**Fedora**](#fedora)
 1. [**Windows**](#windows)
+1. [**Windows Subsystem for Linux**](#windows-subsystem-for-linux)
 1. [**Mac OS X**](#mac-os-x)
 
 ## General Instructions
@@ -80,7 +81,7 @@ A number of tools and libraries are needed in order to recompile everything. You
   - [Beamer](http://latex-beamer.sourceforge.net/) (for some PDF presentations)
 - For building the reference manual:
   - [GNU Texinfo](http://www.gnu.org/software/texinfo/)
-  - [Texi2HTML](http://www.nongnu.org/texi2html) and [Latex2HTML](http://www.latex2html.org), if you want nice mathematical formulas in HTML output
+  - [Latex2HTML](http://www.latex2html.org), if you want nice mathematical formulas in HTML output
   - [Doxygen](http://www.stack.nl/%7Edimitri/doxygen/) (if you want to build Dynare preprocessor source documentation)
 - For Octave, the development libraries corresponding to the UMFPACK packaged with Octave
 
@@ -90,7 +91,7 @@ If you have downloaded the sources from an official source archive or the source
 
 If you want to use Git, do the following from a terminal:
 
-    git clone --recursive http://github.com/DynareTeam/dynare.git
+    git clone --recursive https://github.com/DynareTeam/dynare.git
     cd dynare
     autoreconf -si
 
@@ -129,7 +130,7 @@ If you want to give a try to the parallelized versions of some mex files (`A_tim
 ```
 If the configuration goes well, the script will tell you which components are correctly configured and will be built.
 
-### Bulding
+### Building
 
 Binaries and Info documentation are built with:
 ```
@@ -144,11 +145,67 @@ The testsuites can be run with:
 ```
 make check
 ```
+
+Note that running the testsuite with Octave requires the additional packages
+`pstoedit`, `epstool`, `xfig`, and `gnuplot`.
+
+### Check
+
+The Git source comes with unit tests (in the matlab functions) and integration tests (under the `tests` subfolder). All the tests can be run with:
+```
+make check
+```
+In the `tests` subfolder. If Dynare has been compiled against Matlab and Octave, the tests will be run with Matlab and Octave. Depending on
+your PC, this can take several hours. It is possible to run the tests only with Matlab:
+```
+make check-matlab
+```
+or only with Octave:
+```
+make check-octave
+```
+A summary of the results is available in `tests/run_test_matlab_output.txt` or `tests/run_test_octave_output.txt`. Often, it does not make sense
+to run the complete testsuite. For instance, if you modify codes only related to the perfect foresight model solver, you can decide to run only a
+subset of the integration tests, with:
+```
+make deterministic_simulations
+```
+This will run all the integration tests in `tests/deterministic_simulations` with Matlab and Octave. Again, it is possible to do this only with Matlab:
+```
+make m/deterministic_simulations
+```
+or with Octave:
+```
+make o/deterministic_simulations
+```
+Finally if you want to run a single integration test, e.g. `deterministic_simulations/lbj/rbc.mod` with Matlab:
+```
+make deterministic_simulations/lbj/rbc.m.trs
+```
+or with Octave:
+```
+make deterministic_simulations/lbj/rbc.o.trs
+```
+The result of the test (`PASSED` or `FAILED`) will be printed in the terminal, the produced log can be displayed with:
+```
+make deterministic_simulations/lbj/rbc.m.drs
+```
+or
+```
+make deterministic_simulations/lbj/rbc.o.drs
+```
+Note that only tests will be executed where the `m.trs/o.trs` does not yet exist. You can run
+```
+make clean
+```
+in the `tests` folder to delete files that were created by the run of the testsuite. You can also manually delete the desired `m.trs/o.trs` file(s).
+
 ## Debian or Ubuntu
 
 All the prerequisites are packaged.
 
-The easiest way to install the pre-requisites in Debian is to use Debian's dynare package and do:
+The easiest way to install the pre-requisites in Debian is to use Debian's dynare package and do 
+(requires that you have added the `deb-src` repositories to your `sources.list`):
 ```
 apt-get build-dep dynare
 ```
@@ -162,9 +219,9 @@ Alternatively, if you want to build everything, manually install the following p
 
 - `build-essential` (for gcc, g++ and make)
 - `gfortran`
-- `liboctave-dev` or `octave3.2-headers` (will install ATLAS)
+- `liboctave-dev` (or `octave3.2-headers` on older systems)
 - `libboost-graph-dev`
-- `libgsl0-dev`
+- `libgsl-dev` (or `libgsl0-dev` on older systems)
 - `libmatio-dev`
 - `libslicot-dev` and `libslicot-pic`
 - `libsuitesparse-dev`
@@ -178,9 +235,11 @@ Alternatively, if you want to build everything, manually install the following p
 - `texlive-formats-extra` (for Eplain)
 - `texlive-latex-extra` (for fullpage.sty)
 - `texlive-fonts-extra` (for ccicons)
-- `latex-beamer`
+- `texlive-latex-recommended` (or `latex-beamer` on older systems)
+- `texlive-science` (or `texlive-math-extra` on older systems) (for amstex)
 - `texinfo`
-- `texi2html`, `latex2html`
+- `lmodern` (for macroprocessor PDF)
+- `latex2html`
 - `doxygen`
 
 ## Fedora
@@ -196,13 +255,36 @@ Alternatively, if you want to build everything, manually install the following p
 - `automake`
 - `texlive`
 - `texinfo`
-- `texi2html`, `latex2html`
+- `latex2html`
 - `doxygen`
 
 ## Windows
 
 We no longer support compilation on Windows. To use the unstable version of Dynare on a Windows system, please download it from the [Dynare website](http://www.dynare.org/download/dynare-unstable).
 
+## Windows Subsystem for Linux
+
+Dynare can also be compiled from source for the Windows Subsystem for Linux (WSL). The WSL offers Windows 10 Anniversary Update users easy access to a Linux environment. To install the WSL, see https://msdn.microsoft.com/en-us/commandline/wsl/install_guide
+To install most of the build dependencies, make sure that the local `rootfs/etc/apt/sources.list` contains
+```
+deb-src http://archive.ubuntu.com/ubuntu trusty main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu trusty-updates main restricted universe multiverse
+deb-src http://security.ubuntu.com/ubuntu trusty-security main restricted universe multiverse
+```
+in addition to the regular ```deb``` entries. 
+NB: you cannot edit this file from Windows as this will make the file unreadable for the WSL (rendering WSL unable to detect any package). Therefore, use any Linux editor of your choice.
+
+After that, run 
+```
+apt update
+apt-get build-dep dynare
+```
+If you are building the unstable version, you might also need to install other packages required, e.g 
+```apt-get install texlive-fonts-extra```
+NB: it might be necessary to preface your calls by ```sudo``` in case you do not have root access with the current user
+
+After this, prepare the source and configure the build tree as described for Linux above.
+ 
 ## Mac OS X
 
 - Install the Xcode Command Line Tools:
@@ -223,7 +305,7 @@ We no longer support compilation on Windows. To use the unstable version of Dyna
 - **NB**: If not compiling Dynare mex files for Octave, add ```--without-octave``` to the installation command
 - **NB**: To compile the latest stable version of dynare, follow the same instructions as above, omitting the ```--HEAD``` argument
 - **NB**: To update a ```--HEAD``` install of dynare you need to uninstall it then install it again: ```brew uninstall dynare; brew install dynare --HEAD```.
-- **NB**: If you want to maintain a separate git directory of dynare, you can do a ```--HEAD``` install of dynare, then uninstall it. This will have the effect of bringing in all the dependencies you will need to then compile dynare from your git directory. Then, change to the git directory and type:
+- **NB**: If you want to maintain a separate git directory of dynare, you can do a ```--HEAD``` install of dynare, then uninstall it. This will have the effect of bringing in all the dependencies you will need to then compile dynare from your git directory. (For `flex` and `bison` it may be necessary to symlink them via `brew link bison --force` and `brew link flex --force` as they are keg-only). Then, change to the git directory and type:
     - ```autoreconf -si; ./configure --with-matlab=/Applications/MATLAB_R2015a.app MATLAB_VERSION=R2015a```, adjusting the Matlab path and version to accord with your version
 - Once compilation is done, open Matlab and type the last line shown when you type ```brew info dynare``` in the Terminal window. With the typical Homebrew setup, this is:
     - ```addpath /usr/local/opt/dynare/lib/dynare/matlab```

@@ -12,7 +12,7 @@ function dynare_estimation_1(var_list_,dname)
 % SPECIAL REQUIREMENTS
 %   none
 
-% Copyright (C) 2003-2016 Dynare Team
+% Copyright (C) 2003-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -31,14 +31,33 @@ function dynare_estimation_1(var_list_,dname)
 
 global M_ options_ oo_ estim_params_ bayestopt_ dataset_ dataset_info
 
+if isempty(estim_params_)
+    mode_compute_o = options_.mode_compute;
+    mh_replic_o = options_.mh_replic;
+    options_.mode_compute = 0;
+    options_.mh_replic = 0;
+    reset_options_related_to_estimation = true;
+else
+    reset_options_related_to_estimation = false;
+end
+
+
+%store qz_criterium
+qz_criterium_old=options_.qz_criterium;
+if isnan(options_.first_obs)
+    first_obs_nan_indicator=true;
+else
+    first_obs_nan_indicator=false;
+end
+
 % Set particle filter flag.
 if options_.order > 1
-    if options_.particle.status && options_.order==2  
+    if options_.particle.status && options_.order==2
         skipline()
         disp('Estimation using a non linear filter!')
         skipline()
         if ~options_.nointeractive && ismember(options_.mode_compute,[1,3,4]) && ~strcmpi(options_.particle.filter_algorithm,'gf')% Known gradient-based optimizers
-            disp('You are using a gradient-based mode-finder. Particle filtering introduces discontinuities in the') 
+            disp('You are using a gradient-based mode-finder. Particle filtering introduces discontinuities in the')
             disp('objective function w.r.t the parameters. Thus, should use a non-gradient based optimizer.')
             fprintf('\nPlease choose a mode-finder:\n')
             fprintf('\t 0 - Continue using gradient-based method (it is most likely that you will no get any sensible result).\n')
@@ -155,7 +174,7 @@ catch % if check fails, provide info on using calibration if present
         fprintf('ESTIMATION_CHECKS: There was an error in computing the likelihood for initial parameter values.\n')
         fprintf('ESTIMATION_CHECKS: If this is not a problem with the setting of options (check the error message below),\n')
         fprintf('ESTIMATION_CHECKS: you should try using the calibrated version of the model as starting values. To do\n')
-        fprintf('ESTIMATION_CHECKS: this, add an empty estimated_params_init-block with use_calibration option immediately before the estimation\n')    
+        fprintf('ESTIMATION_CHECKS: this, add an empty estimated_params_init-block with use_calibration option immediately before the estimation\n')
         fprintf('ESTIMATION_CHECKS: command (and after the estimated_params-block so that it does not get overwritten):\n');
         skipline(2);
     end
@@ -164,13 +183,16 @@ end
 
 if isequal(options_.mode_compute,0) && isempty(options_.mode_file) && options_.mh_posterior_mode_estimation==0
     if options_.smoother == 1
+
         if options_.occbin_smoother,
             [atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,T,R,P,PK,decomp,Trend] = occbin_DsgeSmoother0(xparam1,gend,transpose(data),data_index,missing_value);
         else
-            [atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,T,R,P,PK,decomp,Trend] = DsgeSmoother(xparam1,gend,transpose(data),data_index,missing_value);
-        end
-        [oo_]=store_smoother_results(M_,oo_,options_,bayestopt_,dataset_,dataset_info,atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,P,PK,decomp,Trend);
+            [atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,T,R,P,PK,decomp,Trend,state_uncertainty,M_,oo_,options_,bayestopt_] = ...
+                                                                                                      DsgeSmoother(xparam1,gend,transpose(data),data_index,missing_value,M_,oo_,options_,bayestopt_,estim_params_);        end
+        [oo_]=store_smoother_results(M_,oo_,options_,bayestopt_,dataset_,dataset_info,atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,P,PK,decomp,Trend,state_uncertainty);
     end
+    %reset qz_criterium
+    options_.qz_criterium=qz_criterium_old;
     return
 end
 
@@ -189,7 +211,7 @@ if ~isequal(options_.mode_compute,0) && ~options_.mh_posterior_mode_estimation
                 end
             end
         end
-        if options_.analytic_derivation,
+        if options_.analytic_derivation
             options_analytic_derivation_old = options_.analytic_derivation;
             options_.analytic_derivation = -1;
             if ~isempty(newratflag) && newratflag~=0 %numerical hessian explicitly specified
@@ -197,36 +219,40 @@ if ~isequal(options_.mode_compute,0) && ~options_.mh_posterior_mode_estimation
             else %use default
                 newratflag=0; %exclude DYNARE numerical hessian
             end
-        elseif ~options_.analytic_derivation 
-            if isempty(newratflag) 
-                newratflag=options_.newrat.hess; %use default numerical dynare hessian                
+        elseif ~options_.analytic_derivation
+            if isempty(newratflag)
+                newratflag=options_.newrat.hess; %use default numerical dynare hessian
             end
         end
     end
-    
+
     [xparam1, fval, exitflag, hh, options_, Scale, new_rat_hess_info] = dynare_minimize_objective(objective_function,xparam1,options_.mode_compute,options_,[bounds.lb bounds.ub],bayestopt_.name,bayestopt_,hh,dataset_,dataset_info,options_,M_,estim_params_,bayestopt_,bounds,oo_);
     fprintf('\nFinal value of minus the log posterior (or likelihood):%f \n', fval);
 
     if isnumeric(options_.mode_compute) && options_.mode_compute==5 && options_.analytic_derivation==-1 %reset options changed by newrat
-            options_.analytic_derivation = options_analytic_derivation_old; %reset      
+        options_.analytic_derivation = options_analytic_derivation_old; %reset
     elseif isnumeric(options_.mode_compute) && options_.mode_compute==6 %save scaling factor
         save([M_.fname '_optimal_mh_scale_parameter.mat'],'Scale');
         options_.mh_jscale = Scale;
         bayestopt_.jscale = ones(length(xparam1),1)*Scale;
-    end       
+    end
     if ~isnumeric(options_.mode_compute) || ~isequal(options_.mode_compute,6) %always already computes covariance matrix
         if options_.cova_compute == 1 %user did not request covariance not to be computed
-            if options_.analytic_derivation && strcmp(func2str(objective_function),'dsge_likelihood'),
+            if options_.analytic_derivation && strcmp(func2str(objective_function),'dsge_likelihood')
                 ana_deriv_old = options_.analytic_derivation;
                 options_.analytic_derivation = 2;
                 [junk1, junk2,junk3, junk4, hh] = feval(objective_function,xparam1, ...
-                    dataset_,dataset_info,options_,M_,estim_params_,bayestopt_,bounds,oo_);
+                                                        dataset_,dataset_info,options_,M_,estim_params_,bayestopt_,bounds,oo_);
                 options_.analytic_derivation = ana_deriv_old;
-            elseif ~isnumeric(options_.mode_compute) || ~(isequal(options_.mode_compute,5) && newratflag~=1), 
-                % with flag==0, we force to use the hessian from outer
-                % product gradient of optimizer 5
-                hh = reshape(penalty_hessian(objective_function,xparam1,fval, ...
-                    options_.gstep,dataset_,dataset_info,options_,M_,estim_params_,bayestopt_,bounds,oo_),nx,nx);
+            elseif ~isnumeric(options_.mode_compute) || ~(isequal(options_.mode_compute,5) && newratflag~=1 && strcmp(func2str(objective_function),'dsge_likelihood'))
+                % with flag==0, we force to use the hessian from outer product gradient of optimizer 5
+                if options_.hessian.use_penalized_objective
+                    penalized_objective_function = str2func('penalty_objective_function');
+                    hh = hessian(penalized_objective_function, xparam1, options_.gstep, objective_function, fval, dataset_, dataset_info, options_, M_, estim_params_, bayestopt_, bounds,oo_);
+                else
+                    hh = hessian(objective_function, xparam1, options_.gstep, dataset_, dataset_info, options_, M_, estim_params_, bayestopt_, bounds,oo_);
+                end
+                hh = reshape(hh, nx, nx);
             elseif isnumeric(options_.mode_compute) && isequal(options_.mode_compute,5)
                 % other numerical hessian options available with optimizer 5
                 %
@@ -241,15 +267,15 @@ if ~isequal(options_.mode_compute,0) && ~options_.mh_posterior_mode_estimation
                 % densitities for outer product gradient
                 kalman_algo0 = options_.kalman_algo;
                 compute_hessian = 1;
-                if ~((options_.kalman_algo == 2) || (options_.kalman_algo == 4)),
+                if ~((options_.kalman_algo == 2) || (options_.kalman_algo == 4))
                     options_.kalman_algo=2;
-                    if options_.lik_init == 3,
+                    if options_.lik_init == 3
                         options_.kalman_algo=4;
                     end
-                elseif newratflag==0, % hh already contains outer product gradient with univariate filter
-                    compute_hessian = 0;                                            
+                elseif newratflag==0 % hh already contains outer product gradient with univariate filter
+                    compute_hessian = 0;
                 end
-                if compute_hessian,
+                if compute_hessian
                     crit = options_.newrat.tolerance.f;
                     newratflag = newratflag>0;
                     hh = reshape(mr_hessian(xparam1,objective_function,fval,newratflag,crit,new_rat_hess_info,dataset_, dataset_info, options_,M_,estim_params_,bayestopt_,bounds,oo_), nx, nx);
@@ -266,35 +292,6 @@ if ~isequal(options_.mode_compute,0) && ~options_.mh_posterior_mode_estimation
     end
 end
 
-switch options_.MCMC_jumping_covariance
-    case 'hessian' %Baseline
-        %do nothing and use hessian from mode_compute
-    case 'prior_variance' %Use prior variance
-        if any(isinf(bayestopt_.p2))
-            error('Infinite prior variances detected. You cannot use the prior variances as the proposal density, if some variances are Inf.')
-        else
-            hh = diag(1./(bayestopt_.p2.^2));
-        end
-    case 'identity_matrix' %Use identity
-        hh = eye(nx);
-    otherwise %user specified matrix in file
-        try
-            load(options_.MCMC_jumping_covariance,'jumping_covariance')
-            hh=jumping_covariance;
-        catch
-            error(['No matrix named ''jumping_covariance'' could be found in ',options_.MCMC_jumping_covariance,'.mat'])
-        end
-        [nrow, ncol]=size(hh);
-        if ~isequal(nrow,ncol) && ~isequal(nrow,nx) %check if square and right size
-            error(['jumping_covariance matrix must be square and have ',num2str(nx),' rows and columns'])
-        end
-        try %check for positive definiteness
-            chol(hh);
-        catch
-            error(['Specified jumping_covariance is not positive definite'])
-        end
-end
-
 if ~options_.mh_posterior_mode_estimation && options_.cova_compute
     try
         chol(hh);
@@ -308,7 +305,7 @@ if ~options_.mh_posterior_mode_estimation && options_.cova_compute
         params_at_bound=find(abs(xparam1-bounds.ub)<1.e-10 | abs(xparam1-bounds.lb)<1.e-10);
         if ~isempty(params_at_bound)
             for ii=1:length(params_at_bound)
-            params_at_bound_name{ii,1}=get_the_name(params_at_bound(ii),0,M_,estim_params_,options_);
+                params_at_bound_name{ii,1}=get_the_name(params_at_bound(ii),0,M_,estim_params_,options_);
             end
             disp_string=[params_at_bound_name{1,:}];
             for ii=2:size(params_at_bound_name,1)
@@ -396,9 +393,41 @@ if np > 0
     save([M_.fname '_params.mat'],'pindx');
 end
 
+switch options_.MCMC_jumping_covariance
+  case 'hessian' %Baseline
+                 %do nothing and use hessian from mode_compute
+  case 'prior_variance' %Use prior variance
+    if any(isinf(bayestopt_.p2))
+        error('Infinite prior variances detected. You cannot use the prior variances as the proposal density, if some variances are Inf.')
+    else
+        hh = diag(1./(bayestopt_.p2.^2));
+    end
+    hsd = sqrt(diag(hh));
+    invhess = inv(hh./(hsd*hsd'))./(hsd*hsd');
+  case 'identity_matrix' %Use identity
+    invhess = eye(nx);
+  otherwise %user specified matrix in file
+    try
+        load(options_.MCMC_jumping_covariance,'jumping_covariance')
+        hh=jumping_covariance;
+    catch
+        error(['No matrix named ''jumping_covariance'' could be found in ',options_.MCMC_jumping_covariance,'.mat'])
+    end
+    [nrow, ncol]=size(hh);
+    if ~isequal(nrow,ncol) && ~isequal(nrow,nx) %check if square and right size
+        error(['jumping_covariance matrix must be square and have ',num2str(nx),' rows and columns'])
+    end
+    try %check for positive definiteness
+        chol(hh);
+        hsd = sqrt(diag(hh));
+        invhess = inv(hh./(hsd*hsd'))./(hsd*hsd');
+    catch
+        error(['Specified jumping_covariance is not positive definite'])
+    end
+end
+
 if (any(bayestopt_.pshape  >0 ) && options_.mh_replic) || ...
         (any(bayestopt_.pshape >0 ) && options_.load_mh_file)  %% not ML estimation
-    bounds = prior_bounds(bayestopt_, options_.prior_trunc);
     outside_bound_pars=find(xparam1 < bounds.lb | xparam1 > bounds.ub);
     if ~isempty(outside_bound_pars)
         for ii=1:length(outside_bound_pars)
@@ -415,28 +444,41 @@ if (any(bayestopt_.pshape  >0 ) && options_.mh_replic) || ...
         end
     end
     % runs MCMC
-    if options_.mh_replic
-        ana_deriv_old = options_.analytic_derivation;
-        options_.analytic_derivation = 0;
+    if options_.mh_replic || options_.load_mh_file
         posterior_sampler_options = options_.posterior_sampler_options.current_options;
         posterior_sampler_options.invhess = invhess;
         [posterior_sampler_options, options_] = check_posterior_sampler_options(posterior_sampler_options, options_);
         % store current options in global
         options_.posterior_sampler_options.current_options = posterior_sampler_options;
-        posterior_sampler(objective_function,posterior_sampler_options.proposal_distribution,xparam1,posterior_sampler_options,bounds,dataset_,dataset_info,options_,M_,estim_params_,bayestopt_,oo_);
-        options_.analytic_derivation = ana_deriv_old;
+        if options_.mh_replic
+            ana_deriv_old = options_.analytic_derivation;
+            options_.analytic_derivation = 0;
+            posterior_sampler(objective_function,posterior_sampler_options.proposal_distribution,xparam1,posterior_sampler_options,bounds,dataset_,dataset_info,options_,M_,estim_params_,bayestopt_,oo_);
+            options_.analytic_derivation = ana_deriv_old;
+        end
     end
     %% Here I discard first mh_drop percent of the draws:
     CutSample(M_, options_, estim_params_);
     if options_.mh_posterior_mode_estimation
+        %reset qz_criterium
+        options_.qz_criterium=qz_criterium_old;
         return
     else
-        if ~options_.nodiagnostic && options_.mh_replic>0
-            oo_= McMCDiagnostics(options_, estim_params_, M_,oo_);
+        %get stored results if required
+        if options_.load_mh_file && options_.load_results_after_load_mh
+            oo_load_mh=load([M_.fname '_results'],'oo_');
         end
-
+        if ~options_.nodiagnostic
+            if (options_.mh_replic>0 || (options_.load_mh_file && ~options_.load_results_after_load_mh))
+                oo_= McMCDiagnostics(options_, estim_params_, M_,oo_);
+            elseif options_.load_mh_file && options_.load_results_after_load_mh
+                if isfield(oo_load_mh.oo_,'convergence')
+                    oo_.convergence=oo_load_mh.oo_.convergence;
+                end
+            end
+        end
         %% Estimation of the marginal density from the Mh draws:
-        if options_.mh_replic
+        if options_.mh_replic || (options_.load_mh_file && ~options_.load_results_after_load_mh)
             [marginal,oo_] = marginal_density(M_, options_, estim_params_, oo_, bayestopt_);
             % Store posterior statistics by parameter name
             oo_ = GetPosteriorParametersStatistics(estim_params_, M_, options_, bayestopt_, oo_, pnames);
@@ -447,8 +489,25 @@ if (any(bayestopt_.pshape  >0 ) && options_.mh_replic) || ...
             % a matrix
             [oo_.posterior.metropolis.mean,oo_.posterior.metropolis.Variance] ...
                 = GetPosteriorMeanVariance(M_,options_.mh_drop);
-        else
-            load([M_.fname '_results'],'oo_');
+        elseif options_.load_mh_file && options_.load_results_after_load_mh
+            %% load fields from previous MCMC run stored in results-file
+            field_names={'posterior_mode','posterior_std_at_mode',...% fields set by marginal_density
+                         'posterior_mean','posterior_hpdinf','posterior_hpdsup','posterior_median','posterior_variance','posterior_std','posterior_deciles','posterior_density',...% fields set by GetPosteriorParametersStatistics
+                         'prior_density',...%fields set by PlotPosteriorDistributions
+                        };
+            for field_iter=1:size(field_names,2)
+                if isfield(oo_load_mh.oo_,field_names{1,field_iter})
+                    oo_.(field_names{1,field_iter})=oo_load_mh.oo_.(field_names{1,field_iter});
+                end
+            end
+            % field set by marginal_density
+            if isfield(oo_load_mh.oo_,'MarginalDensity') && isfield(oo_load_mh.oo_.MarginalDensity,'ModifiedHarmonicMean')
+                oo_.MarginalDensity.ModifiedHarmonicMean=oo_load_mh.oo_.MarginalDensity.ModifiedHarmonicMean;
+            end
+            % field set by GetPosteriorMeanVariance
+            if isfield(oo_load_mh.oo_,'posterior') && isfield(oo_load_mh.oo_.posterior,'metropolis')
+                oo_.posterior.metropolis=oo_load_mh.oo_.posterior.metropolis;
+            end
         end
         [error_flag,junk,options_]= metropolis_draw(1,options_,estim_params_,M_);
         if options_.bayesian_irf
@@ -469,27 +528,28 @@ if (any(bayestopt_.pshape  >0 ) && options_.mh_replic) || ...
             end
             prior_posterior_statistics('posterior',dataset_,dataset_info);
         end
-        xparam1 = get_posterior_parameters('mean');
+        xparam1 = get_posterior_parameters('mean',M_,estim_params_,oo_,options_);
         M_ = set_all_parameters(xparam1,estim_params_,M_);
     end
 end
 
 if options_.particle.status
+    %reset qz_criterium
+    options_.qz_criterium=qz_criterium_old;
     return
 end
 
-if (~((any(bayestopt_.pshape > 0) && options_.mh_replic) || (any(bayestopt_.pshape ...
-                                                      > 0) && options_.load_mh_file)) ...
+if (~((any(bayestopt_.pshape > 0) && options_.mh_replic) || (any(bayestopt_.pshape> 0) && options_.load_mh_file)) ...
     || ~options_.smoother ) && options_.partial_information == 0  % to be fixed
     %% ML estimation, or posterior mode without Metropolis-Hastings or Metropolis without Bayesian smoothes variables
+
     if options_.occbin_smoother,
         [atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,T,R,P,PK,decomp,Trend] = occbin_DsgeSmoother0(xparam1,dataset_.nobs,transpose(dataset_.data),dataset_info.missing.aindex,dataset_info.missing.state);
     else
-        [atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,T,R,P,PK,decomp,Trend] = DsgeSmoother(xparam1,dataset_.nobs,transpose(dataset_.data),dataset_info.missing.aindex,dataset_info.missing.state);
+        [atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,T,R,P,PK,decomp,Trend,state_uncertainty,M_,oo_,options_,bayestopt_] = DsgeSmoother(xparam1,dataset_.nobs,transpose(dataset_.data),dataset_info.missing.aindex,dataset_info.missing.state,M_,oo_,options_,bayestopt_,estim_params_);
     end
-    [oo_,yf]=store_smoother_results(M_,oo_,options_,bayestopt_,dataset_,dataset_info,atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,P,PK,decomp,Trend);
-
-    if ~options_.nograph,
+    [oo_,yf]=store_smoother_results(M_,oo_,options_,bayestopt_,dataset_,dataset_info,atT,innov,measurement_error,updated_variables,ys,trend_coeff,aK,P,PK,decomp,Trend,state_uncertainty);
+    if ~options_.nograph
         [nbplt,nr,nc,lr,lc,nstar] = pltorg(M_.exo_nbr);
         if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
             fidTeX = fopen([M_.fname '_SmoothedShocks.tex'],'w');
@@ -497,8 +557,8 @@ if (~((any(bayestopt_.pshape > 0) && options_.mh_replic) || (any(bayestopt_.psha
             fprintf(fidTeX,['%% ' datestr(now,0) '\n']);
             fprintf(fidTeX,' \n');
         end
-        for plt = 1:nbplt,
-            fh = dyn_figure(options_,'Name','Smoothed shocks');
+        for plt = 1:nbplt
+            fh = dyn_figure(options_.nodisplay,'Name','Smoothed shocks');
             NAMES = [];
             if options_.TeX, TeXNAMES = []; end
             nstar0=min(nstar,M_.exo_nbr-(plt-1)*nstar);
@@ -509,7 +569,7 @@ if (~((any(bayestopt_.pshape > 0) && options_.mh_replic) || (any(bayestopt_.psha
                 marker_string{1,1}='-r';
                 marker_string{2,1}='-k';
             end
-            for i=1:nstar0,
+            for i=1:nstar0
                 k = (plt-1)*nstar+i;
                 subplot(nr,nc,i);
                 plot([1 gend],[0 0],marker_string{1,1},'linewidth',.5)
@@ -539,7 +599,7 @@ if (~((any(bayestopt_.pshape > 0) && options_.mh_replic) || (any(bayestopt_.psha
                 end
                 title(name,'Interpreter','none')
             end
-            dyn_saveas(fh,[M_.fname '_SmoothedShocks' int2str(plt)],options_);
+            dyn_saveas(fh,[M_.fname '_SmoothedShocks' int2str(plt)],options_.nodisplay,options_.graph_format);
             if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
                 fprintf(fidTeX,'\\begin{figure}[H]\n');
                 for jj = 1:nstar0
@@ -562,10 +622,10 @@ if (~((any(bayestopt_.pshape > 0) && options_.mh_replic) || (any(bayestopt_.psha
     if nvn
         number_of_plots_to_draw = 0;
         index = [];
-        for i=1:n_varobs
-            if max(abs(measurement_error)) > 0.000000001
+        for obs_iter=1:n_varobs
+            if max(abs(measurement_error(obs_iter,:))) > 0.0000001
                 number_of_plots_to_draw = number_of_plots_to_draw + 1;
-                index = cat(1,index,i);
+                index = cat(1,index,obs_iter);
             end
         end
         if ~options_.nograph
@@ -577,10 +637,10 @@ if (~((any(bayestopt_.pshape > 0) && options_.mh_replic) || (any(bayestopt_.psha
                 fprintf(fidTeX,' \n');
             end
             for plt = 1:nbplt
-                fh = dyn_figure(options_,'Name','Smoothed observation errors');
+                fh = dyn_figure(options_.nodisplay,'Name','Smoothed observation errors');
                 NAMES = [];
                 if options_.TeX, TeXNAMES = []; end
-                nstar0=min(nstar,number_of_plots_to_draw-(nbplt-1)*nstar);
+                nstar0=min(nstar,number_of_plots_to_draw-(plt-1)*nstar);
                 if gend==1
                     marker_string{1,1}='-ro';
                     marker_string{2,1}='-ko';
@@ -619,7 +679,7 @@ if (~((any(bayestopt_.pshape > 0) && options_.mh_replic) || (any(bayestopt_.psha
                     end
                     title(name,'Interpreter','none')
                 end
-                dyn_saveas(fh,[M_.fname '_SmoothedObservationErrors' int2str(plt)],options_);
+                dyn_saveas(fh,[M_.fname '_SmoothedObservationErrors' int2str(plt)],options_.nodisplay,options_.graph_format);
                 if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
                     fprintf(fidTeX,'\\begin{figure}[H]\n');
                     for jj = 1:nstar0
@@ -644,75 +704,75 @@ if (~((any(bayestopt_.pshape > 0) && options_.mh_replic) || (any(bayestopt_.psha
     %%  Historical and smoothed variabes
     %%
     if ~options_.nograph
-    [nbplt,nr,nc,lr,lc,nstar] = pltorg(n_varobs);
-    if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
-        fidTeX = fopen([M_.fname '_HistoricalAndSmoothedVariables.tex'],'w');
-        fprintf(fidTeX,'%% TeX eps-loader file generated by dynare_estimation_1.m (Dynare).\n');
-        fprintf(fidTeX,['%% ' datestr(now,0) '\n']);
-        fprintf(fidTeX,' \n');
-    end
-    for plt = 1:nbplt,
-        fh = dyn_figure(options_,'Name','Historical and smoothed variables');
-        NAMES = [];
-        if options_.TeX, TeXNAMES = []; end
-        nstar0=min(nstar,n_varobs-(plt-1)*nstar);
-        if gend==1
-           marker_string{1,1}='-ro';
-           marker_string{2,1}='--ko';
-        else
-           marker_string{1,1}='-r';
-           marker_string{2,1}='--k';
-        end
-        for i=1:nstar0,
-            k = (plt-1)*nstar+i;
-            subplot(nr,nc,i);
-            plot(1:gend,yf(k,:),marker_string{1,1},'linewidth',1)
-            hold on
-            plot(1:gend,rawdata(:,k),marker_string{2,1},'linewidth',1)
-            hold off
-            name = options_.varobs{k};
-            if isempty(NAMES)
-                NAMES = name;
-            else
-                NAMES = char(NAMES,name);
-            end
-            if ~isempty(options_.XTick)
-                set(gca,'XTick',options_.XTick)
-                set(gca,'XTickLabel',options_.XTickLabel)
-            end
-            if gend>1
-                xlim([1 gend])
-            end
-            if options_.TeX
-                idx = strmatch(options_.varobs{k},M_.endo_names,'exact');
-                texname = M_.endo_names_tex(idx,:);
-                if isempty(TeXNAMES)
-                    TeXNAMES = ['$ ' deblank(texname) ' $'];
-                else
-                    TeXNAMES = char(TeXNAMES,['$ ' deblank(texname) ' $']);
-                end
-            end
-            title(name,'Interpreter','none')
-        end
-        dyn_saveas(fh,[M_.fname '_HistoricalAndSmoothedVariables' int2str(plt)],options_);
+        [nbplt,nr,nc,lr,lc,nstar] = pltorg(n_varobs);
         if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
-            fprintf(fidTeX,'\\begin{figure}[H]\n');
-            for jj = 1:nstar0,
-                fprintf(fidTeX,'\\psfrag{%s}[1][][0.5][0]{%s}\n',deblank(NAMES(jj,:)),deblank(TeXNAMES(jj,:)));
-            end
-            fprintf(fidTeX,'\\centering \n');
-            fprintf(fidTeX,'\\includegraphics[width=%2.2f\\textwidth]{%s_HistoricalAndSmoothedVariables%s}\n',options_.figures.textwidth*min(i/nc,1),M_.fname,int2str(plt));
-            fprintf(fidTeX,'\\caption{Historical and smoothed variables.}');
-            fprintf(fidTeX,'\\label{Fig:HistoricalAndSmoothedVariables:%s}\n',int2str(plt));
-            fprintf(fidTeX,'\\end{figure}\n');
-            fprintf(fidTeX,'\n');
+            fidTeX = fopen([M_.fname '_HistoricalAndSmoothedVariables.tex'],'w');
+            fprintf(fidTeX,'%% TeX eps-loader file generated by dynare_estimation_1.m (Dynare).\n');
+            fprintf(fidTeX,['%% ' datestr(now,0) '\n']);
+            fprintf(fidTeX,' \n');
         end
-    end
-    if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
-        fprintf(fidTeX,'\n');
-        fprintf(fidTeX,'%% End of TeX file.\n');
-        fclose(fidTeX);
-    end
+        for plt = 1:nbplt
+            fh = dyn_figure(options_.nodisplay,'Name','Historical and smoothed variables');
+            NAMES = [];
+            if options_.TeX, TeXNAMES = []; end
+            nstar0=min(nstar,n_varobs-(plt-1)*nstar);
+            if gend==1
+                marker_string{1,1}='-ro';
+                marker_string{2,1}='--ko';
+            else
+                marker_string{1,1}='-r';
+                marker_string{2,1}='--k';
+            end
+            for i=1:nstar0
+                k = (plt-1)*nstar+i;
+                subplot(nr,nc,i);
+                plot(1:gend,yf(k,:),marker_string{1,1},'linewidth',1)
+                hold on
+                plot(1:gend,rawdata(:,k),marker_string{2,1},'linewidth',1)
+                hold off
+                name = options_.varobs{k};
+                if isempty(NAMES)
+                    NAMES = name;
+                else
+                    NAMES = char(NAMES,name);
+                end
+                if ~isempty(options_.XTick)
+                    set(gca,'XTick',options_.XTick)
+                    set(gca,'XTickLabel',options_.XTickLabel)
+                end
+                if gend>1
+                    xlim([1 gend])
+                end
+                if options_.TeX
+                    idx = strmatch(options_.varobs{k},M_.endo_names,'exact');
+                    texname = M_.endo_names_tex(idx,:);
+                    if isempty(TeXNAMES)
+                        TeXNAMES = ['$ ' deblank(texname) ' $'];
+                    else
+                        TeXNAMES = char(TeXNAMES,['$ ' deblank(texname) ' $']);
+                    end
+                end
+                title(name,'Interpreter','none')
+            end
+            dyn_saveas(fh,[M_.fname '_HistoricalAndSmoothedVariables' int2str(plt)],options_.nodisplay,options_.graph_format);
+            if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
+                fprintf(fidTeX,'\\begin{figure}[H]\n');
+                for jj = 1:nstar0
+                    fprintf(fidTeX,'\\psfrag{%s}[1][][0.5][0]{%s}\n',deblank(NAMES(jj,:)),deblank(TeXNAMES(jj,:)));
+                end
+                fprintf(fidTeX,'\\centering \n');
+                fprintf(fidTeX,'\\includegraphics[width=%2.2f\\textwidth]{%s_HistoricalAndSmoothedVariables%s}\n',options_.figures.textwidth*min(i/nc,1),M_.fname,int2str(plt));
+                fprintf(fidTeX,'\\caption{Historical and smoothed variables.}');
+                fprintf(fidTeX,'\\label{Fig:HistoricalAndSmoothedVariables:%s}\n',int2str(plt));
+                fprintf(fidTeX,'\\end{figure}\n');
+                fprintf(fidTeX,'\n');
+            end
+        end
+        if options_.TeX && any(strcmp('eps',cellstr(options_.graph_format)))
+            fprintf(fidTeX,'\n');
+            fprintf(fidTeX,'%% End of TeX file.\n');
+            fclose(fidTeX);
+        end
     end
 end
 
@@ -725,3 +785,13 @@ if np > 0
     save([M_.fname '_pindx.mat'] ,'pindx');
 end
 
+%reset qz_criterium
+options_.qz_criterium=qz_criterium_old;
+
+if reset_options_related_to_estimation
+    options_.mode_compute = mode_compute_o;
+    options_.mh_replic = mh_replic_o;
+end
+if first_obs_nan_indicator
+    options_.first_obs=NaN;
+end

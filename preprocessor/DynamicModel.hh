@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2016 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -61,6 +61,13 @@ private:
   //! Maximum lag and lead over deterministic exogenous variables (positive values)
   /*! Set by computeDerivIDs() */
   int max_exo_det_lag, max_exo_det_lead;
+
+  //! Cross reference information
+  map<int, ExprNode::EquationInfo> xrefs;
+  map<pair<int, int>, set<int> > xref_param;
+  map<pair<int, int>, set<int> > xref_endo;
+  map<pair<int, int>, set<int> > xref_exo;
+  map<pair<int, int>, set<int> > xref_exo_det;
 
   //! Number of columns of dynamic jacobian
   /*! Set by computeDerivID()s and computeDynJacobianCols() */
@@ -189,6 +196,12 @@ private:
   /*! pair< pair<static, forward>, pair<backward,mixed> > */
   vector<pair< pair<int, int>, pair<int, int> > > block_col_type;
 
+  //! Help computeXrefs to compute the reverse references (i.e. param->eqs, endo->eqs, etc)
+  void computeRevXref(map<pair<int, int>, set<int> > &xrefset, const set<pair<int, int> > &eiref, int eqn);
+
+  //! Write reverse cross references
+  void writeRevXrefs(ostream &output, const map<pair<int, int>, set<int> > &xrefmap, const string &type) const;
+
   //! List for each variable its block number and its maximum lag and lead inside the block
   vector<pair<int, pair<int, int> > > variable_block_lead_lag;
   //! List for each equation its block number
@@ -202,7 +215,13 @@ public:
   //! Adds a variable node
   /*! This implementation allows for non-zero lag */
   virtual VariableNode *AddVariable(int symb_id, int lag = 0);
-  
+
+  //! Compute cross references
+  void computeXrefs();
+
+  //! Write cross references
+  void writeXrefs(ostream &output) const;
+
   //! Execute computations (variable sorting + derivation)
   /*!
     \param jacobianExo whether derivatives w.r. to exo and exo_det should be in the Jacobian (derivatives w.r. to endo are always computed)
@@ -213,7 +232,7 @@ public:
     \param no_tmp_terms if true, no temporary terms will be computed in the dynamic files
   */
   void computingPass(bool jacobianExo, bool hessian, bool thirdDerivatives, int paramsDerivsOrder,
-                     const eval_context_t &eval_context, bool no_tmp_terms, bool block, bool use_dll, bool bytecode, bool compute_xrefs);
+                     const eval_context_t &eval_context, bool no_tmp_terms, bool block, bool use_dll, bool bytecode);
   //! Writes model initialization and lead/lag incidence matrix to output
   void writeOutput(ostream &output, const string &basename, bool block, bool byte_code, bool use_dll, int order, bool estimation_present, bool compute_xrefs, bool julia) const;
 
@@ -254,12 +273,12 @@ public:
 
   //! Returns number of static only equations
   size_t staticOnlyEquationsNbr() const;
-  
+
   //! Returns number of dynamic only equations
   size_t dynamicOnlyEquationsNbr() const;
 
   //! Writes LaTeX file with the equations of the dynamic model
-  void writeLatexFile(const string &basename) const;
+  void writeLatexFile(const string &basename, const bool write_equation_tags) const;
 
   //! Writes LaTeX file with the equations of the dynamic model (for the original model)
   void writeLatexOriginalFile(const string &basename) const;
@@ -306,7 +325,7 @@ public:
 
   //! Transforms the model by creating aux vars for the diff of forward vars
   /*! If subset is empty, does the transformation for all fwrd vars; otherwise
-      restrict it to the vars in subset */
+    restrict it to the vars in subset */
   void differentiateForwardVars(const vector<string> &subset);
 
   //! Fills eval context with values of model local variables and auxiliary variables
@@ -504,7 +523,7 @@ DynamicModel::checkHessianZero() const
   return second_derivatives.empty();
 }
 
-//! Classes to re-order derivatives for various sparse storage formats 
+//! Classes to re-order derivatives for various sparse storage formats
 class derivative
 {
 public:
@@ -512,14 +531,17 @@ public:
   long unsigned int col_nbr;
   unsigned int row_nbr;
   expr_t value;
-  derivative(long unsigned int arg1, long unsigned int arg2, int arg3, expr_t arg4):
-    linear_address(arg1), col_nbr(arg2), row_nbr(arg3), value(arg4) {};
+  derivative(long unsigned int arg1, long unsigned int arg2, int arg3, expr_t arg4) :
+    linear_address(arg1), col_nbr(arg2), row_nbr(arg3), value(arg4)
+  {
+  };
 };
 
 class derivative_less_than
 {
 public:
-  bool operator()(const derivative & d1, const derivative & d2) const
+  bool
+  operator()(const derivative &d1, const derivative &d2) const
   {
     return d1.linear_address < d2.linear_address;
   }

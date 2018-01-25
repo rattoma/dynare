@@ -11,7 +11,7 @@ function varargout = prior(varargin)
 % SPECIAL REQUIREMENTS
 %   none
 
-% Copyright (C) 2015 Dynare Team
+% Copyright (C) 2015-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -31,16 +31,18 @@ function varargout = prior(varargin)
 if isempty(varargin) || ( isequal(length(varargin), 1) && isequal(varargin{1},'help'))
     skipline()
     disp('Possible options are:')
-    disp(' + table       Prints a table describing the priors.')
-    disp(' + moments     Computes and displays moments of the endogenous variables at the prior mode.')
-    disp(' + optimize    Optimizes the prior density (starting from a random initial guess).')
-    disp(' + simulate    Computes the effective prior mass (using a Monte-Carlo).')
-    disp(' + plot        Plots the marginal prior densities.')
+    disp(' + table                 Prints a table describing the priors.')
+    disp(' + moments               Computes and displays moments of the endogenous variables at the prior mode.')
+    disp(' + optimize              Optimizes the prior density (starting from a random initial guess).')
+    disp(' + simulate              Computes the effective prior mass (using a Monte-Carlo).')
+    disp(' + plot                  Plots the marginal prior densities.')
+    disp(' + moments(distribution) Print tables describing the implied prior for the first and second order unconditional')
+    disp('                         moments of all the endogenous variables.')
     skipline()
     return
 end
 
-global options_ M_ estim_params_ bayestopt_ oo_ 
+global options_ M_ estim_params_ bayestopt_ oo_
 
 donesomething = false;
 
@@ -51,11 +53,11 @@ end
 
 if (size(estim_params_.var_endo,1) || size(estim_params_.corrn,1))
     % Prior over measurement errors are defined...
-   if ((isfield(options_,'varobs') && isempty(options_.varobs)) || ~isfield(options_,'varobs'))
-       % ... But the list of observed variabled is not yet defined.
-       warning('Prior detected on measurement erros, but no list of observed variables (varobs is missing)!')
-       return
-   end
+    if ((isfield(options_,'varobs') && isempty(options_.varobs)) || ~isfield(options_,'varobs'))
+        % ... But the list of observed variabled is not yet defined.
+        warning('Prior detected on measurement erros, but no list of observed variables (varobs is missing)!')
+        return
+    end
 end
 
 % Fill or update bayestopt_ structure
@@ -86,7 +88,11 @@ if ismember('table', varargin)
 end
 
 if ismember('simulate', varargin) % Prior simulations (BK).
-    results = prior_sampler(0, Model, BayesOptions, options_, oo_, EstimatedParams);
+    if ismember('moments(distribution)', varargin)
+        results = prior_sampler(1, Model, BayesOptions, options_, oo_, EstimatedParams);
+    else
+        results = prior_sampler(0, Model, BayesOptions, options_, oo_, EstimatedParams);
+    end
     % Display prior mass info
     skipline(2)
     disp(['Prior mass = ' num2str(results.prior.mass)])
@@ -97,6 +103,9 @@ if ismember('simulate', varargin) % Prior simulations (BK).
     disp(['mjdgges crash share                   = ' num2str(results.dll.problem_share)])
     disp(['Steady state problem share            = ' num2str(results.ss.problem_share)])
     disp(['Complex steady state  share           = ' num2str(results.ss.complex_share)])
+    if options_.loglinear
+        disp(['Nonpositive steady state share        = ' num2str(results.ss.nonpositive_share)])
+    end
     disp(['Analytical steady state problem share = ' num2str(results.ass.problem_share)])
     skipline(2)
     donesomething = true;
@@ -108,7 +117,7 @@ if ismember('optimize', varargin) % Prior optimization.
 end
 
 if ismember('moments', varargin) % Prior simulations (2nd order moments).
-    % Set estimated parameters to the prior mode...
+                                 % Set estimated parameters to the prior mode...
     xparam1 = BayesOptions.p5;
     % ... Except for uniform priors (use the prior mean)!
     k = find(isnan(xparam1));
@@ -122,9 +131,61 @@ if ismember('moments', varargin) % Prior simulations (2nd order moments).
     oo__.dr = set_state_space(oo__.dr, Model, options_);
     % Solve model
     [dr, info, Model , options__ , oo__] = resol(0, Model , options_ ,oo__);
+    if info
+        skipline()
+        disp(sprintf('Cannot solve the model on the prior mode (info = %s, %s)', num2str(info(1)), interpret_resol_info(info)));
+        skipline()
+        return
+    end
     % Compute and display second order moments
     oo__ = disp_th_moments(oo__.dr, [], Model, options__, oo__);
     skipline(2)
+    donesomething = true;
+end
+
+if ismember('moments(distribution)', varargin) % Prior simulations (BK).
+    if ~ismember('simulate', varargin)
+        results = prior_sampler(1, Model, BayesOptions, options_, oo_, EstimatedParams);
+    end
+    priorpath = [Model.dname filesep() 'prior' filesep() 'draws' filesep()];
+    list_of_files = dir([priorpath 'prior_draws*']);
+    FirstOrderMoments = NaN(Model.orig_endo_nbr, options_.prior_mc);
+    SecondOrderMoments = NaN(Model.orig_endo_nbr, Model.orig_endo_nbr, options_.prior_mc);
+    iter = 1;
+    noprint = options_.noprint;
+    options_.noprint = 1;
+    for i=1:length(list_of_files)
+        tmp = load([priorpath list_of_files(i).name]);
+        for j = 1:size(tmp.pdraws, 1)
+            if ~tmp.pdraws{j,2}
+                dr = tmp.pdraws{j,3};
+                oo__ = oo_;
+                oo__.dr = dr;
+                oo__ = disp_th_moments(oo__.dr, [], Model, options_, oo__);
+                FirstOrderMoments(:,iter) = oo__.mean;
+                SecondOrderMoments(:,:,iter) = oo__.var;
+                iter = iter+1;
+            end
+        end
+    end
+    save([M_.dname filesep() 'prior' filesep() M_.fname '_endogenous_variables_prior_draws.mat'], 'FirstOrderMoments', 'SecondOrderMoments')
+    skipline(2)
+    options_.noprint = noprint;
+    % First order moments
+    FirstOrderMoments = FirstOrderMoments(:,1:iter-1);
+    SecondOrderMoments = SecondOrderMoments(:,:,1:iter-1);
+    PriorExpectationOfFirstOrderMoments = mean(FirstOrderMoments, 2);
+    PriorVarianceOfFirstOrderMoments = ...
+        mean(bsxfun(@minus, FirstOrderMoments, PriorExpectationOfFirstOrderMoments).^2, 2);
+    % Second order moments
+    PriorExpectationOfSecondOrderMoments = mean(SecondOrderMoments, 3);
+    PriorVarianceOfSecondOrderMoments = ...
+        mean(bsxfun(@minus, SecondOrderMoments, PriorExpectationOfSecondOrderMoments).^2, 3);
+    % Display first and second order moments implied priors (expectation and variance)
+    print_moments_implied_prior(M_, PriorExpectationOfFirstOrderMoments, ...
+                                PriorVarianceOfFirstOrderMoments, ...
+                                PriorExpectationOfSecondOrderMoments, ...
+                                PriorVarianceOfSecondOrderMoments);
     donesomething = true;
 end
 
@@ -137,22 +198,3 @@ options_.order = order;
 if ~donesomething
     error('prior: Unexpected arguments!')
 end
-
-function format_string = build_format_string(PriorStandardDeviation, LowerBound, UpperBound)
-format_string = ['%s & %s & %6.4f &'];
-if ~isnumeric(PriorStandardDeviation)
-    format_string = [ format_string , ' %s &'];
-else
-    format_string = [ format_string , ' %6.4f &'];
-end
-if ~isnumeric(LowerBound)
-    format_string = [ format_string , ' %s &'];
-else
-    format_string = [ format_string , ' %6.4f &'];
-end
-if ~isnumeric(UpperBound)
-    format_string = [ format_string , ' %s &'];
-else
-    format_string = [ format_string , ' %6.4f &'];
-end
-format_string = [ format_string , ' %6.4f & %6.4f \\\\ \n'];

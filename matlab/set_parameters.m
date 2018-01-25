@@ -4,17 +4,17 @@ function set_parameters(xparam1)
 % Sets parameters value (except measurement errors)
 % This is called for computations such as IRF and forecast
 % when measurement errors aren't taken into account
-% 
+%
 % INPUTS
 %    xparam1:   vector of parameters to be estimated (initial values)
-%    
+%
 % OUTPUTS
 %    none
-%        
+%
 % SPECIAL REQUIREMENTS
 %    none
 
-% Copyright (C) 2003-2013 Dynare Team
+% Copyright (C) 2003-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -31,53 +31,6 @@ function set_parameters(xparam1)
 % You should have received a copy of the GNU General Public License
 % along with Dynare.  If not, see <http://www.gnu.org/licenses/>.
 
-global estim_params_ M_
+global M_
 
-nvx = estim_params_.nvx;
-ncx = estim_params_.ncx;
-nvn = estim_params_.nvn;
-ncn = estim_params_.ncn;
-np = estim_params_.np;
-Sigma_e = M_.Sigma_e;
-Correlation_matrix = M_.Correlation_matrix;
-offset = 0;
-
-% setting shocks variance on the diagonal of Covariance matrix; used later
-% for updating covariances
-if nvx
-    var_exo = estim_params_.var_exo;
-    for i=1:nvx
-        k = var_exo(i,1);
-        Sigma_e(k,k) = xparam1(i)^2;
-    end
-end
-% and update offset
-offset = offset + nvx + nvn;
-
-% correlations amonx shocks (ncx)
-if ncx
-    corrx = estim_params_.corrx;
-    for i=1:ncx
-        k1 = corrx(i,1);
-        k2 = corrx(i,2);
-        Correlation_matrix(k1,k2) = xparam1(i+offset);
-        Correlation_matrix(k2,k1) = Correlation_matrix(k1,k2);
-    end
-end
-%build covariance matrix from correlation matrix and variances already on
-%diagonal
-Sigma_e = diag(sqrt(diag(Sigma_e)))*Correlation_matrix*diag(sqrt(diag(Sigma_e))); 
-if isfield(estim_params_,'calibrated_covariances')
-    Sigma_e(estim_params_.calibrated_covariances.position)=estim_params_.calibrated_covariances.cov_value;
-end
-
-% and update offset
-offset = offset + ncx + ncn;
-
-% structural parameters
-if np
-    M_.params(estim_params_.param_vals(:,1)) = xparam1(offset+1:end);
-end
-
-M_.Sigma_e = Sigma_e;
-M_.Correlation_matrix=Correlation_matrix;
+M_ = set_parameters_locally(M_, xparam1);

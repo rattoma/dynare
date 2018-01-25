@@ -1,10 +1,14 @@
-function [llik,parameters] = evaluate_likelihood(parameters)
+function [llik,parameters] = evaluate_likelihood(parameters,M_,estim_params_,oo_,options_,bayestopt_)
 % Evaluate the logged likelihood at parameters.
 %
 % INPUTS
 %    o parameters  a string ('posterior mode','posterior mean','posterior median','prior mode','prior mean') or a vector of values for
 %                  the (estimated) parameters of the model.
-%
+%    o M_          [structure]  Definition of the model
+%    o estim_params_ [structure] characterizing parameters to be estimated
+%    o oo_         [structure]  Storage of results
+%    o options_    [structure]  Options
+%    o bayestopt_  [structure]  describing the priors
 %
 % OUTPUTS
 %    o ldens       [double]  value of the sample logged density at parameters.
@@ -18,7 +22,7 @@ function [llik,parameters] = evaluate_likelihood(parameters)
 % [2] This function use persistent variables for the dataset and the description of the missing observations. Consequently, if this function
 %     is called more than once (by changing the value of parameters) the sample *must not* change.
 
-% Copyright (C) 2009-2012 Dynare Team
+% Copyright (C) 2009-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -35,8 +39,6 @@ function [llik,parameters] = evaluate_likelihood(parameters)
 % You should have received a copy of the GNU General Public License
 % along with Dynare.  If not, see <http://www.gnu.org/licenses/>.
 
-global options_ M_ bayestopt_ oo_ estim_params_
-
 persistent dataset dataset_info
 
 if nargin==0
@@ -46,11 +48,11 @@ end
 if ischar(parameters)
     switch parameters
       case 'posterior mode'
-        parameters = get_posterior_parameters('mode');
+        parameters = get_posterior_parameters('mode',M_,estim_params_,oo_,options_);
       case 'posterior mean'
-        parameters = get_posterior_parameters('mean');
+        parameters = get_posterior_parameters('mean',M_,estim_params_,oo_,options_);
       case 'posterior median'
-        parameters = get_posterior_parameters('median');
+        parameters = get_posterior_parameters('median',M_,estim_params_,oo_,options_);
       case 'prior mode'
         parameters = bayestopt_.p5(:);
       case 'prior mean'
@@ -69,7 +71,8 @@ end
 if isempty(dataset)
     [dataset, dataset_info] = makedataset(options_);
 end
+options_=select_qz_criterium_value(options_);
 
 llik = -dsge_likelihood(parameters,dataset,dataset_info,options_,M_,estim_params_,bayestopt_,prior_bounds(bayestopt_,options_.prior_trunc),oo_);
-ldens = evaluate_prior(parameters);
+ldens = evaluate_prior(parameters,M_,estim_params_,oo_,options_,bayestopt_);
 llik = llik - ldens;

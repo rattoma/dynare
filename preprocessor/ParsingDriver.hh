@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2016 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -93,6 +93,10 @@ private:
   //! Checks that a given symbol exists and is a endogenous or exogenous, and stops with an error message if it isn't
   void check_symbol_is_endogenous_or_exogenous(string *name);
 
+  //! Checks for symbol existence in model block. If it doesn't exist, an error message is stored to be printed at
+  //! the end of the model block
+  void check_symbol_existence_in_model_block(const string &name);
+
   //! Helper to add a symbol declaration
   void declare_symbol(const string *name, SymbolType type, const string *tex_name, const vector<pair<string *, string *> *> *partition_value);
 
@@ -153,6 +157,8 @@ private:
   InitOrEndValStatement::init_values_t init_values;
   //! Temporary storage for histval blocks
   HistValStatement::hist_values_t hist_values;
+  //! Temporary storage for histval blocks
+  HistValStatement::hist_vals_wrong_lag_t hist_vals_wrong_lag;
   //! Temporary storage for homotopy_setup blocks
   HomotopyStatement::homotopy_values_t homotopy_values;
   //! Temporary storage for moment_calibration
@@ -167,7 +173,7 @@ private:
   map<int, vector<int> > svar_equation_restrictions;
   //! Temporary storage for restrictions in an equation within an svar_identification block
   vector<int> svar_restriction_symbols;
-  //! Temporary storage for constants exculsion within an svar_identification 
+  //! Temporary storage for constants exculsion within an svar_identification
   bool svar_constants_exclusion;
   //! Temporary storage for upper cholesky within an svar_identification block
   bool svar_upper_cholesky;
@@ -178,8 +184,10 @@ private:
   //! Temporary storage for left/right handside of a restriction equation within an svar_identificaton block
   bool svar_left_handside;
   //! Temporary storage for current restriction number in svar_identification block
-  map<int,int> svar_Qi_restriction_nbr;
-  map<int,int> svar_Ri_restriction_nbr;
+  map<int, int> svar_Qi_restriction_nbr;
+  map<int, int> svar_Ri_restriction_nbr;
+  //! Stores undeclared model variables
+  set<string> undeclared_model_vars;
   //! Temporary storage for restriction type
   enum SvarRestrictionType
     {
@@ -210,7 +218,8 @@ private:
   //! Temporary storage for shock_groups
   vector<string> shock_group;
   vector<ShockGroupsStatement::Group> shock_groups;
-  
+  //! Temporary storage for ramsey policy. Workaround for issue #1355
+  vector<string> ramsey_policy_list;
   //! reset the values for temporary storage
   void reset_current_external_function_options();
   //! Adds a model lagged variable to ModelTree and VariableTable
@@ -227,8 +236,14 @@ private:
 
   bool nostrict;
 
+  bool model_error_encountered;
+
+  ostringstream model_errors;
+
 public:
-  ParsingDriver(WarningConsolidation &warnings_arg, bool nostrict_arg) : warnings(warnings_arg), nostrict(nostrict_arg) { };
+  ParsingDriver(WarningConsolidation &warnings_arg, bool nostrict_arg) : warnings(warnings_arg), nostrict(nostrict_arg), model_error_encountered(false)
+  {
+  };
 
   //! Starts parsing, and constructs the MOD file representation
   /*! The returned pointer should be deleted after use */
@@ -255,6 +270,12 @@ public:
   void error(const string &m) __attribute__ ((noreturn));
   //! Warning handler using saved location
   void warning(const string &m);
+
+  //! Error handler with explicit location (used in model block, accumulating error messages to be printed later)
+  void model_error(const string &m);
+
+  //! Code shared between model_error() and error()
+  void create_error_string(const Dynare::parser::location_type &l, const string &m, ostream &stream);
 
   //! Check if a given symbol exists in the parsing context, and is not a mod file local variable
   bool symbol_exists_and_is_not_modfile_local_or_external_function(const char *s);
@@ -340,11 +361,13 @@ public:
   void end_homotopy();
   //! Begin a model block
   void begin_model();
+  //! End a model block, printing errors that were encountered in parsing
+  void end_model();
   //! Writes a shocks statement
   void end_shocks(bool overwrite);
   //! Writes a mshocks statement
   void end_mshocks(bool overwrite);
-  //! Adds a deterministic chock or a path element inside a conditional_forecast_paths block
+  //! Adds a deterministic shock or a path element inside a conditional_forecast_paths block
   void add_det_shock(string *var, bool conditional_forecast);
   //! Adds a std error chock
   void add_stderr_shock(string *var, expr_t value);
@@ -430,11 +453,11 @@ public:
   //! Sets the prior for a parameter
   void set_prior(string *arg1, string *arg2);
   //! Sets the joint prior for a set of parameters
-  void set_joint_prior(vector<string *>*symbol_vec);
+  void set_joint_prior(vector<string *> *symbol_vec);
   //! Adds a parameters to the list of joint parameters
   void add_joint_parameter(string *name);
   //! Adds the variance option to its temporary holding place
-  void set_prior_variance(expr_t variance=NULL);
+  void set_prior_variance(expr_t variance = NULL);
   //! Copies the prior from_name to_name
   void copy_prior(string *to_declaration_type, string *to_name1, string *to_name2, string *to_subsample_name,
                   string *from_declaration_type, string *from_name1, string *from_name2, string *from_subsample_name);
@@ -449,7 +472,7 @@ public:
   void set_std_options(string *arg1, string *arg2);
   //! Sets the prior for estimated correlation
   void set_corr_prior(string *arg1, string *arg2, string *arg3);
- //! Sets the options for estimated correlation
+  //! Sets the options for estimated correlation
   void set_corr_options(string *arg1, string *arg2, string *arg3);
   //! Runs estimation process
   void run_estimation();
@@ -482,11 +505,11 @@ public:
   void add_restriction_equation_nbr(string *eq_nbr);
   //! Svar_Identification Statement: record presence of equal sign
   void add_restriction_equal();
-  //! Svar_Idenditification Statement: add coefficient of a linear restriction (positive value) 
+  //! Svar_Idenditification Statement: add coefficient of a linear restriction (positive value)
   void add_positive_restriction_element(expr_t value, string *variable, string *lag);
-  //! Svar_Idenditification Statement: add unit coefficient of a linear restriction 
+  //! Svar_Idenditification Statement: add unit coefficient of a linear restriction
   void add_positive_restriction_element(string *variable, string *lag);
-  //! Svar_Idenditification Statement: add coefficient of a linear restriction (negative value) 
+  //! Svar_Idenditification Statement: add coefficient of a linear restriction (negative value)
   void add_negative_restriction_element(expr_t value, string *variable, string *lag);
   //! Svar_Idenditification Statement: add negative unit coefficient of a linear restriction
   void add_negative_restriction_element(string *variable, string *lag);
@@ -515,7 +538,7 @@ public:
   void run_load_params_and_steady_state(string *filename);
   void run_save_params_and_steady_state(string *filename);
   void run_identification();
-  void add_mc_filename(string *filename, string *prior = new string("1"));
+  void add_mc_filename(string *filename, string *prior = new string ("1"));
   void run_model_comparison();
   //! Begin a planner_objective statement
   void begin_planner_objective();
@@ -540,7 +563,7 @@ public:
   //! Discretionary policy statement
   void discretionary_policy();
   //! Adds a write_latex_dynamic_model statement
-  void write_latex_dynamic_model();
+  void write_latex_dynamic_model(bool write_equation_tags);
   //! Adds a write_latex_static_model statement
   void write_latex_static_model();
   //! Adds a write_latex_original_model statement
@@ -571,6 +594,12 @@ public:
   void markov_switching();
   //! Shock decomposition
   void shock_decomposition();
+  //! Realtime Shock decomposition
+  void realtime_shock_decomposition();
+  //! Plot Shock decomposition
+  void plot_shock_decomposition();
+  //! Initial Condition decomposition
+  void initial_condition_decomposition();
   //! Conditional forecast statement
   void conditional_forecast();
   //! Conditional forecast paths block
@@ -667,6 +696,8 @@ public:
   void push_external_function_arg_vector_onto_stack();
   //! Adds an external function argument
   void add_external_function_arg(expr_t arg);
+  //! Test to see if model/external function has exactly one integer argument
+  pair<bool, double> is_there_one_integer_argument() const;
   //! Adds an external function call node
   expr_t add_model_var_or_external_function(string *function_name, bool in_model_block);
   //! Adds a native statement
@@ -699,6 +730,8 @@ public:
   void add_graph_format(const string &name);
   //! Add the graph_format option to the OptionsList structure
   void process_graph_format_option();
+  //! Add the graph_format option to the plot_shock_decomp substructure of the OptionsList structure
+  void plot_shock_decomp_process_graph_format_option();
   //! Model diagnostics
   void model_diagnostics();
   //! Processing the parallel_local_files option
@@ -717,7 +750,8 @@ public:
   void add_shock_group(string *name);
   //! End shock groups declaration
   void end_shock_groups(const string *name);
-    
+  //! Add an element to the ramsey policy list
+  void add_to_ramsey_policy_list(string *name);
   void smoother2histval();
   void histval_file(string *filename);
   void perfect_foresight_setup();

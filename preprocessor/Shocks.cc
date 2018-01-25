@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2016 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -94,9 +94,9 @@ ShocksStatement::writeOutput(ostream &output, const string &basename, bool minim
       output << "M_.det_shocks = [];" << endl;
 
       output << "M_.Sigma_e = zeros(" << symbol_table.exo_nbr() << ", "
-              << symbol_table.exo_nbr() << ");" << endl
-              << "M_.Correlation_matrix = eye(" << symbol_table.exo_nbr() << ", "
-              << symbol_table.exo_nbr() << ");" << endl;
+             << symbol_table.exo_nbr() << ");" << endl
+             << "M_.Correlation_matrix = eye(" << symbol_table.exo_nbr() << ", "
+             << symbol_table.exo_nbr() << ");" << endl;
 
       if (has_calibrated_measurement_errors())
         output << "M_.H = zeros(" << symbol_table.observedVariablesNbr() << ", "
@@ -254,7 +254,7 @@ ShocksStatement::checkPass(ModFileStructure &mod_file_struct, WarningConsolidati
     {
       int symb_id1 = it->first.first;
       int symb_id2 = it->first.second;
-      
+
       if (!((symbol_table.getType(symb_id1) == eExogenous
              && symbol_table.getType(symb_id2) == eExogenous)
             || (symbol_table.isObservedVariable(symb_id1)
@@ -272,7 +272,7 @@ ShocksStatement::checkPass(ModFileStructure &mod_file_struct, WarningConsolidati
     {
       int symb_id1 = it->first.first;
       int symb_id2 = it->first.second;
-      
+
       if (!((symbol_table.getType(symb_id1) == eExogenous
              && symbol_table.getType(symb_id2) == eExogenous)
             || (symbol_table.isObservedVariable(symb_id1)
@@ -463,13 +463,29 @@ ShockGroupsStatement::ShockGroupsStatement(const group_t &shock_groups_arg, cons
 void
 ShockGroupsStatement::writeOutput(ostream &output, const string &basename, bool minimal_workspace) const
 {
-  for (vector<Group>::const_iterator it = shock_groups.begin(); it != shock_groups.end(); it++)
+  int i = 1;
+  bool unique_label = true;
+  for (vector<Group>::const_iterator it = shock_groups.begin(); it != shock_groups.end(); it++, unique_label = true)
     {
-      output << "M_.shock_groups." << name
-             << "." << it->name << " = {";
-      for ( vector<string>::const_iterator it1 = it->list.begin(); it1 != it->list.end(); it1++)
-        output << " '" << *it1 << "'";
-      output << "};" << endl;
+      for (vector<Group>::const_iterator it1 = it+1; it1 != shock_groups.end(); it1++)
+        if (it->name == it1->name)
+          {
+            unique_label = false;
+            cerr << "Warning: shock group label '" << it->name << "' has been reused. "
+                 << "Only using the last definition." << endl;
+            break;
+          }
+
+      if (unique_label)
+        {
+          output << "M_.shock_groups." << name
+                 << ".group" << i << ".label = '" << it->name << "';" << endl
+                 << "M_.shock_groups." << name
+                 << ".group" << i << ".shocks = {";
+          for (vector<string>::const_iterator it1 = it->list.begin(); it1 != it->list.end(); it1++)
+            output << " '" << *it1 << "'";
+          output << "};" << endl;
+          i++;
+        }
     }
 }
-  

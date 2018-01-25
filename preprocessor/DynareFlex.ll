@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2016 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -150,6 +150,9 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <INITIAL>histval_file {BEGIN DYNARE_STATEMENT; return token::HISTVAL_FILE;}
 <INITIAL>forecast {BEGIN DYNARE_STATEMENT; return token::FORECAST;}
 <INITIAL>shock_decomposition {BEGIN DYNARE_STATEMENT; return token::SHOCK_DECOMPOSITION;}
+<INITIAL>realtime_shock_decomposition {BEGIN DYNARE_STATEMENT; return token::REALTIME_SHOCK_DECOMPOSITION;}
+<INITIAL>plot_shock_decomposition {BEGIN DYNARE_STATEMENT; return token::PLOT_SHOCK_DECOMPOSITION;}
+<INITIAL>initial_condition_decomposition {BEGIN DYNARE_STATEMENT; return token::INITIAL_CONDITION_DECOMPOSITION;}
 <INITIAL>sbvar {BEGIN DYNARE_STATEMENT; return token::SBVAR;}
 <INITIAL>ms_estimation {BEGIN DYNARE_STATEMENT; return token::MS_ESTIMATION;}
 <INITIAL>ms_simulation {BEGIN DYNARE_STATEMENT; return token::MS_SIMULATION;}
@@ -272,8 +275,12 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>lik_init  		{return token::LIK_INIT;}
 <DYNARE_STATEMENT>taper_steps       {return token::TAPER_STEPS;}
 <DYNARE_STATEMENT>geweke_interval   {return token::GEWEKE_INTERVAL;}
+<DYNARE_STATEMENT>raftery_lewis_qrs {return token::RAFTERY_LEWIS_QRS;}
+<DYNARE_STATEMENT>raftery_lewis_diagnostics {return token::RAFTERY_LEWIS_DIAGNOSTICS;}
 <DYNARE_STATEMENT>graph   		{return token::GRAPH;}
 <DYNARE_STATEMENT>nograph   		{return token::NOGRAPH;}
+<DYNARE_STATEMENT>posterior_graph   		{return token::POSTERIOR_GRAPH;}
+<DYNARE_STATEMENT>posterior_nograph   		{return token::POSTERIOR_NOGRAPH;}
 <DYNARE_STATEMENT>nodisplay     {return token::NODISPLAY;}
 <DYNARE_STATEMENT>graph_format  {return token::GRAPH_FORMAT;}
 <DYNARE_STATEMENT>eps  {yylval->string_val = new string(yytext); return token::EPS;}
@@ -298,6 +305,7 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>mh_mode 		{return token::MH_MODE;}
 <DYNARE_STATEMENT>mh_nblocks 		{return token::MH_NBLOCKS;}
 <DYNARE_STATEMENT>load_mh_file 	{return token::LOAD_MH_FILE;}
+<DYNARE_STATEMENT>load_results_after_load_mh 	{return token::LOAD_RESULTS_AFTER_LOAD_MH;}
 <DYNARE_STATEMENT>loglinear 		{return token::LOGLINEAR;}
 <DYNARE_STATEMENT>linear_approximation 		{return token::LINEAR_APPROXIMATION;}
 <DYNARE_STATEMENT>logdata 	{return token::LOGDATA;}
@@ -354,6 +362,7 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>vlist {return token::VLIST;}
 <DYNARE_STATEMENT>vlistlog {return token::VLISTLOG;}
 <DYNARE_STATEMENT>vlistper {return token::VLISTPER;}
+<DYNARE_STATEMENT>keep_kalman_algo_if_singularity_is_detected {return token::KEEP_KALMAN_ALGO_IF_SINGULARITY_IS_DETECTED;}
 <DYNARE_STATEMENT>restriction_fname {return token::RESTRICTION_FNAME;}
 <DYNARE_STATEMENT>nlags {return token::NLAGS;}
 <DYNARE_STATEMENT>restrictions {return token::RESTRICTIONS;}
@@ -367,6 +376,8 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>indxscalesstates {return token::INDXSCALESSTATES;}
 <DYNARE_STATEMENT>fixed_point {return token::FIXED_POINT;}
 <DYNARE_STATEMENT>doubling {return token::DOUBLING;}
+<DYNARE_STATEMENT>plot_init_date {return token::PLOT_INIT_DATE;}
+<DYNARE_STATEMENT>plot_end_date {return token::PLOT_END_DATE;}
 <DYNARE_STATEMENT>square_root_solver {return token::SQUARE_ROOT_SOLVER;}
 <DYNARE_STATEMENT>cycle_reduction {return token::CYCLE_REDUCTION;}
 <DYNARE_STATEMENT>logarithmic_reduction {return token::LOGARITHMIC_REDUCTION;}
@@ -387,6 +398,7 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>amisanotristani {return token::AMISANOTRISTANI;}
 <DYNARE_STATEMENT>murrayjonesparslow {return token::MURRAYJONESPARSLOW;}
 <DYNARE_STATEMENT>filter_algorithm {return token::FILTER_ALGORITHM;}
+<DYNARE_STATEMENT>nonlinear_filter_initialization {return token::NONLINEAR_FILTER_INITIALIZATION;}
 <DYNARE_STATEMENT>proposal_approximation {return token::PROPOSAL_APPROXIMATION;}
 <DYNARE_STATEMENT>cubature {return token::CUBATURE;}
 <DYNARE_STATEMENT>unscented {return token::UNSCENTED;}
@@ -394,6 +406,8 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>distribution_approximation {return token::DISTRIBUTION_APPROXIMATION;}
 <DYNARE_STATEMENT>proposal_distribution {return token::PROPOSAL_DISTRIBUTION;}
 <DYNARE_STATEMENT>no_posterior_kernel_density {return token::NO_POSTERIOR_KERNEL_DENSITY;}
+<DYNARE_STATEMENT>rescale_prediction_error_covariance {return token::RESCALE_PREDICTION_ERROR_COVARIANCE;}
+<DYNARE_STATEMENT>use_penalized_objective_for_hessian {return token::USE_PENALIZED_OBJECTIVE_FOR_HESSIAN;}
 
 <DYNARE_STATEMENT>alpha {
   yylval->string_val = new string(yytext);
@@ -452,6 +466,7 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
   yylval->string_val = new string(yytext);
   return token::ABAND;
 }
+<DYNARE_STATEMENT>write_equation_tags {return token::WRITE_EQUATION_TAGS;}
 <DYNARE_STATEMENT>indxap {return token::INDXAP;}
 <DYNARE_STATEMENT>apband {return token::APBAND;}
 <DYNARE_STATEMENT>indximf {return token::INDXIMF;}
@@ -563,6 +578,20 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 
 <DYNARE_STATEMENT>controlled_varexo {return token::CONTROLLED_VAREXO; }
 <DYNARE_STATEMENT>parameter_set {return token::PARAMETER_SET; }
+<DYNARE_STATEMENT>init_state {return token::INIT_STATE; }
+<DYNARE_STATEMENT>save_realtime {return token::SAVE_REALTIME;}
+<DYNARE_STATEMENT>detail_plot {return token::DETAIL_PLOT;}
+<DYNARE_STATEMENT>interactive {return token::INTERACTIVE;}
+<DYNARE_STATEMENT>screen_shocks {return token::SCREEN_SHOCKS;}
+<DYNARE_STATEMENT>steadystate {return token::STEADYSTATE;}
+<DYNARE_STATEMENT>type {return token::TYPE;}
+<DYNARE_STATEMENT>qoq {return token::QOQ; }
+<DYNARE_STATEMENT>yoy {return token::YOY; }
+<DYNARE_STATEMENT>aoa {return token::AOA; }
+<DYNARE_STATEMENT>fig_name {return token::FIG_NAME;}
+<DYNARE_STATEMENT>write_xls {return token::WRITE_XLS;}
+<DYNARE_STATEMENT>realtime {return token::REALTIME;}
+<DYNARE_STATEMENT>vintage {return token::VINTAGE;}
 <DYNARE_STATEMENT>prior_mode {return token::PRIOR_MODE; }
 <DYNARE_STATEMENT>prior_mean {return token::PRIOR_MEAN; }
 <DYNARE_STATEMENT>posterior_mode {return token::POSTERIOR_MODE; }
@@ -572,6 +601,7 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>k_order_solver {return token::K_ORDER_SOLVER; }
 <DYNARE_STATEMENT>filter_covariance {return token::FILTER_COVARIANCE; }
 <DYNARE_STATEMENT>filter_decomposition {return token::FILTER_DECOMPOSITION; }
+<DYNARE_STATEMENT>smoothed_state_uncertainty {return token::SMOOTHED_STATE_UNCERTAINTY; }
 <DYNARE_STATEMENT>selected_variables_only {return token::SELECTED_VARIABLES_ONLY; }
 <DYNARE_STATEMENT>pruning {return token::PRUNING; }
 <DYNARE_STATEMENT>save_draws {return token::SAVE_DRAWS; }
@@ -598,7 +628,6 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>posterior_sampler_options {return token::POSTERIOR_SAMPLER_OPTIONS;}
 <DYNARE_STATEMENT>silent_optimizer {return token::SILENT_OPTIMIZER;}
 <DYNARE_STATEMENT>lmmcp {return token::LMMCP;}
-<DYNARE_STATEMENT>occbin {return token::OCCBIN;}
 
 <DYNARE_STATEMENT>[\$][^$]*[\$] {
   strtok(yytext+1, "$");
@@ -635,6 +664,7 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>dr_algo {return token::DR_ALGO;}
 <DYNARE_STATEMENT>simul_algo {return token::SIMUL_ALGO;}
 <DYNARE_STATEMENT>stack_solve_algo {return token::STACK_SOLVE_ALGO;}
+<DYNARE_STATEMENT>robust_lin_solve {return token::ROBUST_LIN_SOLVE;}
 <DYNARE_STATEMENT>drop {return token::DROP;}
 <DYNARE_STATEMENT>order {return token::ORDER;}
 <DYNARE_STATEMENT>sylvester {return token::SYLVESTER;}
@@ -770,7 +800,6 @@ DATE -?[0-9]+([YyAa]|[Mm]([1-9]|1[0-2])|[Qq][1-4]|[Ww]([1-9]{1}|[1-4][0-9]|5[0-2
 <DYNARE_STATEMENT>load_rmse {return token::LOAD_RMSE;}
 <DYNARE_STATEMENT>load_stab {return token::LOAD_STAB;}
 <DYNARE_STATEMENT>alpha2_stab {return token::ALPHA2_STAB;}
-<DYNARE_STATEMENT>ksstat {return token::KSSTAT;}
 <DYNARE_STATEMENT>logtrans_redform {return token::LOGTRANS_REDFORM;}
 <DYNARE_STATEMENT>threshold_redform {return token::THRESHOLD_REDFORM;}
 <DYNARE_STATEMENT>ksstat_redform {return token::KSSTAT_REDFORM;}

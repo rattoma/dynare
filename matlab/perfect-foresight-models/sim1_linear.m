@@ -2,7 +2,7 @@ function [endogenousvariables, info] = sim1_linear(endogenousvariables, exogenou
 
 % Solves a linear approximation of a perfect foresight model using sparse matrix.
 %
-% INPUTS 
+% INPUTS
 % - endogenousvariables [double] N*T array, paths for the endogenous variables (initial guess).
 % - exogenousvariables  [double] T*M array, paths for the exogenous variables.
 % - steadystate_y       [double] N*1 array, steady state for the endogenous variables.
@@ -10,16 +10,16 @@ function [endogenousvariables, info] = sim1_linear(endogenousvariables, exogenou
 % - M                   [struct] contains a description of the model.
 % - options             [struct] contains various options.
 %
-% OUTPUTS 
+% OUTPUTS
 % - endogenousvariables [double] N*T array, paths for the endogenous variables (solution of the perfect foresight model).
 % - info                [struct] contains informations about the results.
 %
-% NOTATIONS 
+% NOTATIONS
 % - N is the number of endogenous variables.
 % - M is the number of innovations.
 % - T is the number of periods (including initial and/or terminal conditions).
 %
-% REMARKS 
+% REMARKS
 % - The structure `M` describing the structure of the model, must contain the
 % following informations:
 %  + lead_lag_incidence, incidence matrix (given by the preprocessor).
@@ -38,7 +38,7 @@ function [endogenousvariables, info] = sim1_linear(endogenousvariables, exogenou
 % to center the variables around the deterministic steady state to solve the
 % perfect foresight model.
 
-% Copyright (C) 2015 Dynare Team
+% Copyright (C) 2015-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -108,10 +108,12 @@ if verbose
 end
 
 dynamicmodel = str2func([M.fname,'_dynamic']);
+
 z = steadystate_y([ip; ic; in]);
+x = repmat(transpose(steadystate_x), 1+M.maximum_exo_lag+M.maximum_exo_lead, 1);
 
 % Evaluate the Jacobian of the dynamic model at the deterministic steady state.
-[d1,jacobian] = dynamicmodel(z, transpose(steadystate_x), params, steadystate_y, 1);
+[d1, jacobian] = dynamicmodel(z, x, params, steadystate_y, M.maximum_exo_lag+1);
 
 % Check that the dynamic model was evaluated at the steady state.
 if max(abs(d1))>1e-12

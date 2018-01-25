@@ -2,15 +2,15 @@ function t = wblinv(proba, scale, shape)   % --*-- Unitary tests --*--
 
 % Inverse cumulative distribution function.
 %
-% INPUTS 
+% INPUTS
 % - proba [double] Probability, scalar between 0 and 1.
 % - scale [double] Positive hyperparameter.
 % - shape [double] Positive hyperparameter.
 %
-% OUTPUTS 
+% OUTPUTS
 % - t     [double] scalar such that P(X<=t)=proba
 
-% Copyright (C) 2015 Dynare Team
+% Copyright (C) 2015-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -148,17 +148,20 @@ t = exp(log(scale)+log(-log(1-proba))/shape);
 %$               [shape, scale, x(k-1)]
 %$           end
 %$           if isoctave
-%$               s = quadv(density, 0, x(k-1));
+%$               s = quadv(density, 0, x(k-1),1e-10);
 %$           else
 %$               s = integral(density, 0, x(k-1));
 %$           end
 %$           if debug
 %$               [s, abs(p-s)]
 %$           end
+%$         if isoctave
+%$           t(k) = abs(p-s)<1e-10;
+%$         else
 %$           t(k) = abs(p-s)<1e-12;
+%$         end
 %$       end
 %$    end
 %$ end
 %$ T = all(t);
 %@eof:4
-

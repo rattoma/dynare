@@ -11,7 +11,7 @@ function global_initialization()
 % SPECIAL REQUIREMENTS
 %    none
 
-% Copyright (C) 2003-2016 Dynare Team
+% Copyright (C) 2003-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -134,6 +134,8 @@ options_.graphics.line_width = 1;
 options_.graph_format = 'eps';
 options_.nodisplay = 0;
 options_.nograph = 0;
+options_.no_graph.posterior = 0;
+options_.no_graph.shock_decomposition = 0;
 options_.XTick = [];
 options_.XTickLabel = [];
 options_.console_mode = 0;
@@ -163,9 +165,9 @@ options_.nocorr = 0;
 options_.periods = 0;
 options_.noprint = 0;
 options_.SpectralDensity.trigger = 0;
-options_.SpectralDensity.plot  = 1; 
-options_.SpectralDensity.cutoff  = 150; 
-options_.SpectralDensity.sdl = 0.01; 
+options_.SpectralDensity.plot  = 1;
+options_.SpectralDensity.cutoff  = 150;
+options_.SpectralDensity.sdl = 0.01;
 options_.nofunctions = false;
 
 options_.bandpass.indicator = 0;
@@ -280,7 +282,7 @@ particle.resampling.number_of_partitions = 200;
 particle.mixture_state_variables = 5 ;
 particle.mixture_structural_shocks = 1 ;
 particle.mixture_measurement_shocks = 1 ;
-% Online approach 
+% Online approach
 particle.liu_west_delta = 0.99 ;
 particle.liu_west_chol_sigma_bar = .01 ;
 % Options for setting the weights in conditional particle filters.
@@ -413,17 +415,20 @@ options_.bayesian_th_moments = 0;
 options_.diffuse_filter = 0;
 options_.filter_step_ahead = [];
 options_.filtered_vars = 0;
+options_.smoothed_state_uncertainty = 0;
 options_.first_obs = NaN;
 options_.nobs = NaN;
 options_.kalman_algo = 0;
 options_.fast_kalman_filter = 0;
 options_.kalman_tol = 1e-10;
+options_.kalman.keep_kalman_algo_if_singularity_is_detected = 0;
 options_.diffuse_kalman_tol = 1e-6;
 options_.use_univariate_filters_if_singularity_is_detected = 1;
 options_.riccati_tol = 1e-6;
 options_.lik_algo = 1;
 options_.lik_init = 1;
 options_.load_mh_file = 0;
+options_.load_results_after_load_mh = 0;
 options_.logdata = 0;
 options_.loglinear = 0;
 options_.linear_approximation = 0;
@@ -466,17 +471,19 @@ options_.sub_draws = [];
 options_.gradient_method = 2; %used by csminwel and newrat
 options_.gradient_epsilon = 1e-6; %used by csminwel and newrat
 options_.posterior_sampler_options.sampling_opt = []; %extended set of options for individual posterior samplers
-% Random Walk Metropolis-Hastings
+                                                      % Random Walk Metropolis-Hastings
 options_.posterior_sampler_options.posterior_sampling_method = 'random_walk_metropolis_hastings';
 options_.posterior_sampler_options.rwmh.proposal_distribution = 'rand_multivariate_normal';
 options_.posterior_sampler_options.rwmh.student_degrees_of_freedom = 3;
 options_.posterior_sampler_options.rwmh.use_mh_covariance_matrix=0;
+options_.posterior_sampler_options.rwmh.save_tmp_file=0;
 % Tailored Random Block Metropolis-Hastings
 options_.posterior_sampler_options.tarb.proposal_distribution = 'rand_multivariate_normal';
 options_.posterior_sampler_options.tarb.student_degrees_of_freedom = 3;
 options_.posterior_sampler_options.tarb.mode_compute=4;
 options_.posterior_sampler_options.tarb.new_block_probability=0.25; %probability that next parameter belongs to new block
 options_.posterior_sampler_options.tarb.optim_opt=''; %probability that next parameter belongs to new block
+options_.posterior_sampler_options.tarb.save_tmp_file=1;
 % Slice
 options_.posterior_sampler_options.slice.proposal_distribution = '';
 options_.posterior_sampler_options.slice.rotated=0;
@@ -486,9 +493,11 @@ options_.posterior_sampler_options.slice.WR=[];
 options_.posterior_sampler_options.slice.mode_files=[];
 options_.posterior_sampler_options.slice.mode=[];
 options_.posterior_sampler_options.slice.initial_step_size=0.8;
+options_.posterior_sampler_options.slice.save_tmp_file=1;
 % Independent Metropolis-Hastings
 options_.posterior_sampler_options.imh.proposal_distribution = 'rand_multivariate_normal';
 options_.posterior_sampler_options.imh.use_mh_covariance_matrix=0;
+options_.posterior_sampler_options.imh.save_tmp_file=0;
 
 options_.trace_plot_ma = 200;
 options_.mh_autocorrelation_function_size = 30;
@@ -511,13 +520,12 @@ options_.filter_decomposition = 0;
 options_.selected_variables_only = 0;
 options_.contemporaneous_correlation = 0;
 options_.initialize_estimated_parameters_with_the_prior_mode = 0;
-options_.estimation_dll = 0;
 options_.estimation.moments_posterior_density.indicator = 1;
 options_.estimation.moments_posterior_density.gridpoints = 2^9;
 options_.estimation.moments_posterior_density.bandwidth = 0; % Rule of thumb optimal bandwidth parameter.
 options_.estimation.moments_posterior_density.kernel_function = 'gaussian'; % Gaussian kernel for Fast Fourrier Transform approximaton.
-% Misc
-% options_.conf_sig = 0.6;
+                                                                            % Misc
+                                                                            % options_.conf_sig = 0.6;
 oo_.exo_simul = [];
 oo_.endo_simul = [];
 ys0_ = [];
@@ -555,6 +563,14 @@ M_.osr.variable_indices =[];
 options_.homotopy_mode = 0;
 options_.homotopy_steps = 1;
 options_.homotopy_force_continue = 0;
+
+% numerical hessian
+hessian.use_penalized_objective = false;
+
+% Robust prediction error covariance (kalman filter)
+options_.rescale_prediction_error_covariance = false;
+
+options_.hessian = hessian;
 
 %csminwel optimization routine
 csminwel.tolerance.f=1e-7;
@@ -615,7 +631,7 @@ options_.simpsa = simpsa;
 %solveopt optimizer
 solveopt.minimizer_indicator=-1; %use minimizer
 solveopt.TolX=1e-6; %accuracy of argument
-solveopt.TolFun=1e-6; %accuracy of function 
+solveopt.TolFun=1e-6; %accuracy of function
 solveopt.MaxIter=15000;
 solveopt.verbosity=1;
 solveopt.TolXConstraint=1.e-8;
@@ -635,6 +651,23 @@ options_.saopt.ns=10;
 options_.saopt.nt=10;
 options_.saopt.step_length_c=0.1;
 options_.saopt.initial_step_length=1;
+
+% particleswarm (global optimization toolbox needed)
+particleswarm.Display = 'iter';
+particleswarm.DisplayInterval = 1;
+particleswarm.FunctionTolerance = 1e-6;
+particleswarm.FunValCheck = 'on';
+particleswarm.HybridFcn = [];
+particleswarm.InertiaRange = [0.1, 1.1];
+particleswarm.MaxIterations = 100000;
+particleswarm.MaxStallIterations = 20;
+particleswarm.MaxStallTime = Inf;
+particleswarm.MaxTime = Inf;
+particleswarm.MinNeighborsFraction = .25;
+particleswarm.ObjectiveLimit = -Inf;
+particleswarm.UseParallel = false;
+particleswarm.UseVectorized = false;
+options_.particleswarm = particleswarm;
 
 % prior analysis
 options_.prior_mc = 20000;
@@ -691,7 +724,14 @@ options_.discretionary_tol = 1e-7;
 % Shock decomposition
 options_.parameter_set = [];
 options_.use_shock_groups = '';
-options_.colormap = '';
+options_.shock_decomp.colormap = '';
+options_.shock_decomp.init_state = 0;
+
+% Shock decomposition realtime
+options_.shock_decomp.forecast = 0;
+options_.shock_decomp.presample = NaN;
+options_.shock_decomp.save_realtime = 0; % saves memory
+options_ = set_default_plot_shock_decomposition_options(options_);
 
 % Nonlinearfilters
 options_.nonlinear_filter = [];
@@ -761,6 +801,9 @@ options_.gpu = 0;
 %Geweke convergence diagnostics
 options_.convergence.geweke.taper_steps=[4 8 15];
 options_.convergence.geweke.geweke_interval=[0.2 0.5];
+%Raftery/Lewis convergence diagnostics;
+options_.convergence.rafterylewis.indicator=0;
+options_.convergence.rafterylewis.qrs=[0.025 0.005 0.95];
 
 % Options for lmmcp solver
 options_.lmmcp.status = 0;
@@ -797,4 +840,3 @@ set_dynare_seed('default');
 if isfield(options_, 'global_init_file')
     run(options_.global_init_file);
 end
-

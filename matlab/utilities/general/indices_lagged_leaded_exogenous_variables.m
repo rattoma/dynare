@@ -1,4 +1,4 @@
-function [il,l1,ik,k1] = indices_lagged_leaded_exogenous(k,M)
+function [il,l1,ik,k1] = indices_lagged_leaded_exogenous_variables(k,M)
 % returns indices of all endogenous variables split between auxiliary
 % variables for lagged or leaded exogenous variables and all other ones
 %
@@ -12,8 +12,8 @@ function [il,l1,ik,k1] = indices_lagged_leaded_exogenous(k,M)
 % ik: indices of non lagged or leaded variable in vector k
 % k1: value of non lagged or leaded variable in vector k
 
-% Copyright (C) 2011-2016 Dynare Team
-%    
+% Copyright (C) 2011-2017 Dynare Team
+%
 % This file is part of Dynare.
 %
 % Dynare is free software: you can redistribute it and/or modify

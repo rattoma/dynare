@@ -1,5 +1,5 @@
 function rep = CountryTablePage(rep, countryAbbr, countryName, db_q, dc_q, db_a, dc_a, trange, vline_after)
-% Copyright (C) 2013-2014 Dynare Team
+% Copyright (C) 2013-2016 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -61,7 +61,7 @@ for i=1:length(seriesNames)
     delta = delta.tex_rename('$\Delta$');
 
     deltaa = db_a{[seriesNames{i}{1} countryAbbr]}-dc_a{[seriesNames{i}{1} countryAbbr]};
-    deltaa = delta.tex_rename('$\Delta$');
+    deltaa = deltaa.tex_rename('$\Delta$');
     rep = rep.addSeries('data', delta, ...
                         'tableShowMarkers', true, ...
                         'tableRowIndent', 2, ...

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2016 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -36,7 +36,7 @@ using namespace MFS;
 bool
 ModelTree::computeNormalization(const jacob_map_t &contemporaneous_jacobian, bool verbose)
 {
-  const int n = equation_number();
+  const int n = equations.size();
 
   assert(n == symbol_table.endo_nbr());
 
@@ -96,7 +96,7 @@ ModelTree::computeNormalization(const jacob_map_t &contemporaneous_jacobian, boo
 #endif
 
   // Create the resulting map, by copying the n first elements of mate_map, and substracting n to them
-  endo2eq.resize(equation_number());
+  endo2eq.resize(equations.size());
   transform(mate_map.begin(), mate_map.begin() + n, endo2eq.begin(), bind2nd(minus<int>(), n));
 
 #ifdef DEBUG
@@ -143,7 +143,7 @@ ModelTree::computeNonSingularNormalization(jacob_map_t &contemporaneous_jacobian
 
   cout << "Normalizing the model..." << endl;
 
-  int n = equation_number();
+  int n = equations.size();
 
   // compute the maximum value of each row of the contemporaneous Jacobian matrix
   //jacob_map normalized_contemporaneous_jacobian;
@@ -212,7 +212,7 @@ ModelTree::computeNonSingularNormalization(jacob_map_t &contemporaneous_jacobian
                   if (first_derivatives.find(make_pair(it->first.first, getDerivID(symbol_table.getID(eEndogenous, it->first.second), 0))) == first_derivatives.end())
                     first_derivatives[make_pair(it->first.first, getDerivID(symbol_table.getID(eEndogenous, it->first.second), 0))] = Zero;
                 }
-              catch(DataTree::UnknownDerivIDException &e)
+              catch (DataTree::UnknownDerivIDException &e)
                 {
                   cerr << "The variable " << symbol_table.getName(symbol_table.getID(eEndogenous, it->first.second))
                        << " does not appear at the current period (i.e. with no lead and no lag); this case is not handled by the 'block' option of the 'model' block." << endl;
@@ -230,106 +230,9 @@ ModelTree::computeNonSingularNormalization(jacob_map_t &contemporaneous_jacobian
 }
 
 void
-ModelTree::computeXrefs()
-{
-  int i = 0;
-  for (vector<BinaryOpNode *>::iterator it = equations.begin();
-       it != equations.end(); it++)
-    {
-      ExprNode::EquationInfo ei;
-      (*it)->computeXrefs(ei);
-      xrefs[i++] = ei;
-    }
-
-  i = 0;
-  for (map<int, ExprNode::EquationInfo>::const_iterator it = xrefs.begin();
-       it != xrefs.end(); it++, i++)
-    {
-      computeRevXref(xref_param, it->second.param, i);
-      computeRevXref(xref_endo, it->second.endo, i);
-      computeRevXref(xref_exo, it->second.exo, i);
-      computeRevXref(xref_exo_det, it->second.exo_det, i);
-    }
-}
-
-void
-ModelTree::computeRevXref(map<int, set<int> > &xrefset, const set<int> &eiref, int eqn)
-{
-  for (set<int>::const_iterator it1 = eiref.begin();
-       it1 != eiref.end(); it1++)
-    {
-      set<int> eq;
-      if (xrefset.find(symbol_table.getTypeSpecificID(*it1)) != xrefset.end())
-        eq = xrefset[symbol_table.getTypeSpecificID(*it1)];
-      eq.insert(eqn);
-      xrefset[symbol_table.getTypeSpecificID(*it1)] = eq;
-    }
-}
-
-void
-ModelTree::writeXrefs(ostream &output) const
-{
-  output << "M_.xref1.param = cell(1, M_.eq_nbr);" << endl
-         << "M_.xref1.endo = cell(1, M_.eq_nbr);" << endl
-         << "M_.xref1.exo = cell(1, M_.eq_nbr);" << endl
-         << "M_.xref1.exo_det = cell(1, M_.eq_nbr);" << endl
-         << "M_.xref2.param = cell(1, M_.eq_nbr);" << endl
-         << "M_.xref2.endo = cell(1, M_.eq_nbr);" << endl
-         << "M_.xref2.exo = cell(1, M_.eq_nbr);" << endl
-         << "M_.xref2.exo_det = cell(1, M_.eq_nbr);" << endl;
-  int i = 1;
-  for (map<int, ExprNode::EquationInfo>::const_iterator it = xrefs.begin();
-       it != xrefs.end(); it++, i++)
-    {
-      output << "M_.xref1.param{" << i << "} = [ ";
-      for (set<int>::const_iterator it1 = it->second.param.begin();
-           it1 != it->second.param.end(); it1++)
-        output << symbol_table.getTypeSpecificID(*it1) + 1 << " ";
-      output << "];" << endl;
-
-      output << "M_.xref1.endo{" << i << "} = [ ";
-      for (set<int>::const_iterator it1 = it->second.endo.begin();
-           it1 != it->second.endo.end(); it1++)
-        output << symbol_table.getTypeSpecificID(*it1) + 1 << " ";
-      output << "];" << endl;
-
-      output << "M_.xref1.exo{" << i << "} = [ ";
-      for (set<int>::const_iterator it1 = it->second.exo.begin();
-           it1 != it->second.exo.end(); it1++)
-        output << symbol_table.getTypeSpecificID(*it1) + 1 << " ";
-      output << "];" << endl;
-
-      output << "M_.xref1.exo_det{" << i << "} = [ ";
-      for (set<int>::const_iterator it1 = it->second.exo_det.begin();
-           it1 != it->second.exo_det.end(); it1++)
-        output << symbol_table.getTypeSpecificID(*it1) + 1 << " ";
-      output << "];" << endl;
-    }
-
-  writeRevXrefs(output, xref_param, "param");
-  writeRevXrefs(output, xref_endo, "endo");
-  writeRevXrefs(output, xref_exo, "exo");
-  writeRevXrefs(output, xref_exo_det, "exo_det");
-}
-
-void
-ModelTree::writeRevXrefs(ostream &output, const map<int, set<int> > &xrefmap, const string &type) const
-{
-  for (map<int, set<int> >::const_iterator it = xrefmap.begin();
-       it != xrefmap.end(); it++)
-    {
-      output << "M_.xref2." << type << "{" << it->first + 1 << "} = [ ";
-      for (set<int>::const_iterator it1 = it->second.begin();
-           it1 != it->second.end(); it1++)
-        output << *it1 + 1 << " ";
-      output << "];" << endl;
-    }
-}
-
-void
 ModelTree::computeNormalizedEquations(multimap<int, int> &endo2eqs) const
 {
-  for (int i = 0; i < equation_number(); i++)
+  for (size_t i = 0; i < equations.size(); i++)
     {
       VariableNode *lhs = dynamic_cast<VariableNode *>(equations[i]->get_arg1());
       if (lhs == NULL)
@@ -344,7 +247,7 @@ ModelTree::computeNormalizedEquations(multimap<int, int> &endo2eqs) const
       if (endo.find(make_pair(symbol_table.getTypeSpecificID(symb_id), 0)) != endo.end())
         continue;
 
-      endo2eqs.insert(make_pair(symbol_table.getTypeSpecificID(symb_id), i));
+      endo2eqs.insert(make_pair(symbol_table.getTypeSpecificID(symb_id), (int) i));
       cout << "Endogenous " << symbol_table.getName(symb_id) << " normalized in equation " << (i+1) << endl;
     }
 }
@@ -417,11 +320,11 @@ ModelTree::evaluateAndReduceJacobian(const eval_context_t &eval_context, jacob_m
 void
 ModelTree::computePrologueAndEpilogue(const jacob_map_t &static_jacobian_arg, vector<int> &equation_reordered, vector<int> &variable_reordered)
 {
-  vector<int> eq2endo(equation_number(), 0);
-  equation_reordered.resize(equation_number());
-  variable_reordered.resize(equation_number());
+  vector<int> eq2endo(equations.size(), 0);
+  equation_reordered.resize(equations.size());
+  variable_reordered.resize(equations.size());
   bool *IM;
-  int n = equation_number();
+  int n = equations.size();
   IM = (bool *) calloc(n*n, sizeof(bool));
   int i = 0;
   for (vector<int>::const_iterator it = endo2eq.begin(); it != endo2eq.end(); it++, i++)
@@ -984,7 +887,7 @@ ModelTree::reduceBlocksAndTypeDetermination(const dynamic_jacob_map_t &dynamic_j
               int c_Size = (block_type_size_mfs[block_type_size_mfs.size()-1]).second.first;
               int first_equation = (block_type_size_mfs[block_type_size_mfs.size()-1]).first.second;
               if (c_Size > 0 && ((prev_Type ==  EVALUATE_FORWARD && Simulation_Type == EVALUATE_FORWARD && !is_lead)
-                  || (prev_Type ==  EVALUATE_BACKWARD && Simulation_Type == EVALUATE_BACKWARD && !is_lag)))
+                                 || (prev_Type ==  EVALUATE_BACKWARD && Simulation_Type == EVALUATE_BACKWARD && !is_lag)))
                 {
                   for (int j = first_equation; j < first_equation+c_Size; j++)
                     {
@@ -1222,10 +1125,10 @@ ModelTree::computeTemporaryTerms(bool is_matlab)
   temporary_terms_g2.clear();
   temporary_terms_g3.clear();
   map<NodeTreeReference, temporary_terms_t> temp_terms_map;
-  temp_terms_map[eResiduals]=temporary_terms_res;
-  temp_terms_map[eFirstDeriv]=temporary_terms_g1;
-  temp_terms_map[eSecondDeriv]=temporary_terms_g2;
-  temp_terms_map[eThirdDeriv]=temporary_terms_g3;
+  temp_terms_map[eResiduals] = temporary_terms_res;
+  temp_terms_map[eFirstDeriv] = temporary_terms_g1;
+  temp_terms_map[eSecondDeriv] = temporary_terms_g2;
+  temp_terms_map[eThirdDeriv] = temporary_terms_g3;
 
   for (vector<BinaryOpNode *>::iterator it = equations.begin();
        it != equations.end(); it++)
@@ -1293,6 +1196,128 @@ ModelTree::writeTemporaryTerms(const temporary_terms_t &tt, const temporary_term
 }
 
 void
+ModelTree::fixNestedParenthesis(ostringstream &output, map<string, string> &tmp_paren_vars, bool &message_printed) const
+{
+  string str = output.str();
+  if (!testNestedParenthesis(str))
+    return;
+  int open = 0;
+  int first_open_paren = 0;
+  int matching_paren = 0;
+  bool hit_limit = false;
+  int i1 = 0;
+  map<string, string>::iterator it;
+  for (size_t i = 0; i < str.length(); i++)
+    {
+      if (str.at(i) == '(')
+        {
+          if (open == 0)
+            first_open_paren = i;
+          open++;
+        }
+      else if (str.at(i) == ')')
+        {
+          open--;
+          if (open == 0)
+            matching_paren = i;
+        }
+      if (open > 32)
+        hit_limit = true;
+
+      if (hit_limit && open == 0)
+        {
+          if (!message_printed)
+            {
+              cerr << "Warning: A .m file created by Dynare will have more than 32 nested parenthesis. Matlab cannot support this. " << endl
+                   << "         We are going to modify, albeit inefficiently, this output to have fewer than 32 nested parenthesis. " << endl
+                   << "         It would hence behoove you to use the use_dll option of the model block to circumnavigate this problem." << endl
+                   << "         If you have not yet set up a compiler on your system, see the Matlab documentation for doing so." << endl
+                   << "         For Windows, see: https://www.mathworks.com/help/matlab/matlab_external/install-mingw-support-package.html" << endl << endl;
+              message_printed = true;
+            }
+          string str1 = str.substr(first_open_paren, matching_paren - first_open_paren + 1);
+          string repstr = "";
+          string varname;
+          while (testNestedParenthesis(str1))
+            {
+              size_t open_paren_idx  = string::npos;
+              size_t match_paren_idx = string::npos;
+              size_t last_open_paren = string::npos;
+              for (size_t j = 0; j < str1.length(); j++)
+                {
+                  if (str1.at(j) == '(')
+                    {
+                      // don't match, e.g. y(1)
+                      size_t idx = str1.find_last_of("*/-+", j - 1);
+                      if (j == 0 || (idx != string::npos && idx == j - 1))
+                        open_paren_idx = j;
+                      last_open_paren = j;
+                    }
+                  else if (str1.at(j) == ')')
+                    {
+                      // don't match, e.g. y(1)
+                      size_t idx = str1.find_last_not_of("0123456789", j - 1);
+                      if (idx != string::npos && idx != last_open_paren)
+                        match_paren_idx = j;
+                    }
+
+                  if (open_paren_idx != string::npos && match_paren_idx != string::npos)
+                    {
+                      string val = str1.substr(open_paren_idx, match_paren_idx - open_paren_idx + 1);
+                      it = tmp_paren_vars.find(val);
+                      if (it == tmp_paren_vars.end())
+                        {
+                          ostringstream ptvstr;
+                          ptvstr << i1++;
+                          varname = "paren32_tmp_var_" + ptvstr.str();
+                          repstr = repstr + varname + " = " + val + ";\n";
+                          tmp_paren_vars[val] = varname;
+                        }
+                      else
+                        varname = it->second;
+                      str1.replace(open_paren_idx, match_paren_idx - open_paren_idx + 1, varname);
+                      break;
+                    }
+                }
+            }
+          it = tmp_paren_vars.find(str1);
+          if (it == tmp_paren_vars.end())
+            {
+              ostringstream ptvstr;
+              ptvstr << i1++;
+              varname = "paren32_tmp_var_" + ptvstr.str();
+              repstr = repstr + varname + " = " + str1 + ";\n";
+            }
+          else
+            varname = it->second;
+          str.replace(first_open_paren, matching_paren - first_open_paren + 1, varname);
+          size_t insertLoc = str.find_last_of("\n", first_open_paren);
+          str.insert(insertLoc + 1, repstr);
+          hit_limit = false;
+          i = -1;
+          first_open_paren = matching_paren = open = 0;
+        }
+    }
+  output.str(str);
+}
+
+bool
+ModelTree::testNestedParenthesis(const string &str) const
+{
+  int open = 0;
+  for (size_t i = 0; i < str.length(); i++)
+    {
+      if (str.at(i) == '(')
+        open++;
+      else if (str.at(i) == ')')
+        open--;
+      if (open > 32)
+        return true;
+    }
+  return false;
+}
+
+void
 ModelTree::compileTemporaryTerms(ostream &code_file, unsigned int &instruction_number, const temporary_terms_t &tt, map_idx_t map_idx, bool dynamic, bool steady_dynamic) const
 {
   // Local var used to keep track of temp nodes already written
@@ -1307,17 +1332,17 @@ ModelTree::compileTemporaryTerms(ostream &code_file, unsigned int &instruction_n
           (*it)->compileExternalFunctionOutput(code_file, instruction_number, false, tt2, map_idx, dynamic, steady_dynamic, tef_terms);
         }
 
-      FNUMEXPR_ fnumexpr(TemporaryTerm, (int) (map_idx.find((*it)->idx)->second));
+      FNUMEXPR_ fnumexpr(TemporaryTerm, (int)(map_idx.find((*it)->idx)->second));
       fnumexpr.write(code_file, instruction_number);
       (*it)->compile(code_file, instruction_number, false, tt2, map_idx, dynamic, steady_dynamic, tef_terms);
       if (dynamic)
         {
-          FSTPT_ fstpt((int) (map_idx.find((*it)->idx)->second));
+          FSTPT_ fstpt((int)(map_idx.find((*it)->idx)->second));
           fstpt.write(code_file, instruction_number);
         }
       else
         {
-          FSTPST_ fstpst((int) (map_idx.find((*it)->idx)->second));
+          FSTPST_ fstpst((int)(map_idx.find((*it)->idx)->second));
           fstpst.write(code_file, instruction_number);
         }
       // Insert current node into tt2
@@ -1472,7 +1497,7 @@ ModelTree::Write_Inf_To_Bin_File(const string &basename,
     SaveCode.open(bin_basename.c_str(), ios::out | ios::binary);
   if (!SaveCode.is_open())
     {
-      cout << "Error : Can't open file \"" << bin_basename << "\" for writing\n";
+      cerr << "Error : Can't open file \"" << bin_basename << "\" for writing" << endl;
       exit(EXIT_FAILURE);
     }
   u_count_int = 0;
@@ -1504,7 +1529,7 @@ ModelTree::Write_Inf_To_Bin_File(const string &basename,
 }
 
 void
-ModelTree::writeLatexModelFile(const string &basename, ExprNodeOutputType output_type) const
+ModelTree::writeLatexModelFile(const string &basename, ExprNodeOutputType output_type, const bool write_equation_tags) const
 {
   ofstream output, content_output;
   string filename = basename + ".tex";
@@ -1548,8 +1573,31 @@ ModelTree::writeLatexModelFile(const string &basename, ExprNodeOutputType output
 
   for (int eq = 0; eq < (int) equations.size(); eq++)
     {
-      content_output << "\\begin{dmath}" << endl
-                     << "% Equation " << eq+1 << endl;
+      content_output << "% Equation " << eq + 1 << endl;
+      bool wrote_eq_tag = false;
+      if (write_equation_tags)
+        {
+          for (vector<pair<int, pair<string, string> > >::const_iterator iteqt = equation_tags.begin();
+               iteqt != equation_tags.end(); iteqt++)
+            if (iteqt->first == eq)
+              {
+                if (!wrote_eq_tag)
+                  content_output << "\\noindent[";
+                else
+                  content_output << ", ";
+
+                content_output << iteqt->second.first;
+
+                if (iteqt->second.second.empty())
+                  content_output << "= `" << iteqt->second.second << "'";
+
+                wrote_eq_tag = true;
+              }
+        }
+      if (wrote_eq_tag)
+        content_output << "]";
+
+      content_output << "\\begin{dmath}" << endl;
       // Here it is necessary to cast to superclass ExprNode, otherwise the overloaded writeOutput() method is not found
       dynamic_cast<ExprNode *>(equations[eq])->writeOutput(content_output, output_type);
       content_output << endl << "\\end{dmath}" << endl;
@@ -1575,7 +1623,7 @@ ModelTree::addEquation(expr_t eq, int lineno)
 void
 ModelTree::addEquation(expr_t eq, int lineno, vector<pair<string, string> > &eq_tags)
 {
-  int n = equation_number();
+  int n = equations.size();
   for (size_t i = 0; i < eq_tags.size(); i++)
     equation_tags.push_back(make_pair(n, eq_tags[i]));
   addEquation(eq, lineno);
@@ -1619,7 +1667,7 @@ ModelTree::addNonstationaryVariables(vector<int> nonstationary_vars, bool log_de
 void
 ModelTree::initializeVariablesAndEquations()
 {
-  for (int j = 0; j < equation_number(); j++)
+  for (size_t j = 0; j < equations.size(); j++)
     {
       equation_reordered.push_back(j);
       variable_reordered.push_back(j);
@@ -1744,11 +1792,11 @@ ModelTree::computeParamsDerivativesTemporaryTerms()
   map<expr_t, pair<int, NodeTreeReference > > reference_count;
   params_derivs_temporary_terms.clear();
   map<NodeTreeReference, temporary_terms_t> temp_terms_map;
-  temp_terms_map[eResidualsParamsDeriv]=params_derivs_temporary_terms_res;
-  temp_terms_map[eJacobianParamsDeriv]=params_derivs_temporary_terms_g1;
-  temp_terms_map[eResidualsParamsSecondDeriv]=params_derivs_temporary_terms_res2;
-  temp_terms_map[eJacobianParamsSecondDeriv]=params_derivs_temporary_terms_g12;
-  temp_terms_map[eHessianParamsDeriv]=params_derivs_temporary_terms_g2;
+  temp_terms_map[eResidualsParamsDeriv] = params_derivs_temporary_terms_res;
+  temp_terms_map[eJacobianParamsDeriv] = params_derivs_temporary_terms_g1;
+  temp_terms_map[eResidualsParamsSecondDeriv] = params_derivs_temporary_terms_res2;
+  temp_terms_map[eJacobianParamsSecondDeriv] = params_derivs_temporary_terms_g12;
+  temp_terms_map[eHessianParamsDeriv] = params_derivs_temporary_terms_g2;
 
   for (first_derivatives_t::iterator it = residuals_params_derivatives.begin();
        it != residuals_params_derivatives.end(); it++)
@@ -1791,9 +1839,9 @@ ModelTree::computeParamsDerivativesTemporaryTerms()
   params_derivs_temporary_terms_g2   = temp_terms_map[eHessianParamsDeriv];
 }
 
-bool ModelTree::isNonstationary(int symb_id) const
+bool
+ModelTree::isNonstationary(int symb_id) const
 {
   return (nonstationary_symbols_map.find(symb_id)
           != nonstationary_symbols_map.end());
 }
-

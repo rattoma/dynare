@@ -107,7 +107,7 @@ function [fval,info,exit_flag,DLIK,Hess,ys,trend_coeff,Model,DynareOptions,Bayes
 %! @end deftypefn
 %@eod:
 
-% Copyright (C) 2010-2016 Dynare Team
+% Copyright (C) 2010-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -124,9 +124,6 @@ function [fval,info,exit_flag,DLIK,Hess,ys,trend_coeff,Model,DynareOptions,Bayes
 % You should have received a copy of the GNU General Public License
 % along with Dynare.  If not, see <http://www.gnu.org/licenses/>.
 
-% AUTHOR(S) stephane DOT adjemian AT univ DASH lemans DOT fr
-%           frederic DOT karame AT univ DASH lemans DOT fr
-
 % Declaration of the penalty as a persistent variable.
 persistent init_flag
 persistent restrict_variables_idx observed_variables_idx state_variables_idx mf0 mf1
@@ -140,6 +137,9 @@ exit_flag       = 1;
 DLIK            = [];
 Hess            = [];
 
+% Ensure that xparam1 is a column vector.
+xparam1 = xparam1(:);
+
 % Issue an error if loglinear option is used.
 if DynareOptions.loglinear
     error('non_linear_dsge_likelihood: It is not possible to use a non linear filter with the option loglinear!')
@@ -150,7 +150,7 @@ end
 %------------------------------------------------------------------------------
 
 % Return, with endogenous penalty, if some parameters are smaller than the lower bound of the prior domain.
-if (DynareOptions.mode_compute~=1) && any(xparam1<BoundsInfo.lb)
+if isestimation(DynareOptions) && (DynareOptions.mode_compute~=1) && any(xparam1<BoundsInfo.lb)
     k = find(xparam1(:) < BoundsInfo.lb);
     fval = Inf;
     exit_flag = 0;
@@ -160,7 +160,7 @@ if (DynareOptions.mode_compute~=1) && any(xparam1<BoundsInfo.lb)
 end
 
 % Return, with endogenous penalty, if some parameters are greater than the upper bound of the prior domain.
-if (DynareOptions.mode_compute~=1) && any(xparam1>BoundsInfo.ub)
+if isestimation(DynareOptions) && (DynareOptions.mode_compute~=1) && any(xparam1>BoundsInfo.ub)
     k = find(xparam1(:)>BoundsInfo.ub);
     fval = Inf;
     exit_flag = 0;
@@ -229,8 +229,8 @@ end
 
 if info(1)
     if info(1) == 3 || info(1) == 4 || info(1) == 5 || info(1)==6 ||info(1) == 19 || ...
-            info(1) == 20 || info(1) == 21 || info(1) == 23 || info(1) == 26 || ...
-            info(1) == 81 || info(1) == 84 ||  info(1) == 85
+                info(1) == 20 || info(1) == 21 || info(1) == 23 || info(1) == 26 || ...
+                info(1) == 81 || info(1) == 84 ||  info(1) == 85
         %meaningful second entry of output that can be used
         fval = Inf;
         info(4) = info(2);
@@ -306,7 +306,7 @@ ReducedForm.mf1 = mf1;
 switch DynareOptions.particle.initialization
   case 1% Initial state vector covariance is the ergodic variance associated to the first order Taylor-approximation of the model.
     StateVectorMean = ReducedForm.constant(mf0);
-    StateVectorVariance = lyapunov_symm(ReducedForm.ghx(mf0,:),ReducedForm.ghu(mf0,:)*ReducedForm.Q*ReducedForm.ghu(mf0,:)',DynareOptions.lyapunov_fixed_point_tol,DynareOptions.qz_criterium,DynareOptions.lyapunov_complex_threshold,[],[],DynareOptions.debug);
+    StateVectorVariance = lyapunov_symm(ReducedForm.ghx(mf0,:),ReducedForm.ghu(mf0,:)*ReducedForm.Q*ReducedForm.ghu(mf0,:)',DynareOptions.lyapunov_fixed_point_tol,DynareOptions.qz_criterium,DynareOptions.lyapunov_complex_threshold,[],DynareOptions.debug);
   case 2% Initial state vector covariance is a monte-carlo based estimate of the ergodic variance (consistent with a k-order Taylor-approximation of the model).
     StateVectorMean = ReducedForm.constant(mf0);
     old_DynareOptionsperiods = DynareOptions.periods;
@@ -316,7 +316,8 @@ switch DynareOptions.particle.initialization
     StateVectorVariance = cov(y_');
     DynareOptions.periods = old_DynareOptionsperiods;
     clear('old_DynareOptionsperiods','y_');
-  case 3% Initial state vector covariance is a diagonal matrix.
+  case 3% Initial state vector covariance is a diagonal matrix (to be used
+        % if model has stochastic trends).
     StateVectorMean = ReducedForm.constant(mf0);
     StateVectorVariance = DynareOptions.particle.initial_state_prior_std*eye(number_of_state_variables);
   otherwise
@@ -375,4 +376,3 @@ if isinf(LIK)~=0
     exit_flag = 0;
     return
 end
-

@@ -2,7 +2,7 @@
 // Involves a call to solve_one_boundary.m that is tested here
 
 if ~isoctave() && ~matlab_ver_less_than('8.4')
-   websave('lola_data.mat','http://www.dynare.org/Datasets/lola_data.mat')
+   websave('lola_data.mat','http://www.dynare.org/Datasets/lola_data.mat', weboptions('Timeout', 30))
 else
    urlwrite('http://www.dynare.org/Datasets/lola_data.mat','lola_data.mat')
 end
@@ -979,5 +979,9 @@ end;
 % *******************************************
 
 simul(periods=125,maxit=100);
+
+if ~oo_.deterministic_simulation.status
+   error('Perfect foresight simulation failed')
+end
 
 delete('lola_data.mat')

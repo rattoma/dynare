@@ -1,8 +1,5 @@
 var y_backward;
 
-// Exogenous variable: technology level
-varexo x;
-
 parameters rho_1 rho_2;
 
 rho_1=0.2;
@@ -29,16 +26,13 @@ end;
 // Check the Blanchard-Kahn conditions
 check;
 
-// Declare a positive technological shock in period 1
-shocks;
-var x;
-periods 1;
-values 1.2;
-end;
-
 // Deterministic simulation of the model for 200 periods
 options_.solve_tolf=1e-12;
 simul(periods=100);
+
+if ~oo_.deterministic_simulation.status
+   error('Perfect foresight simulation failed')
+end
 
 // Display the path of consumption and capital
 rplot y_backward;

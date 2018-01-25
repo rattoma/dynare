@@ -1,4 +1,4 @@
-% Copyright (C) 2013 Dynare Team
+% Copyright (C) 2013-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -24,11 +24,8 @@ if ~strcmp(dynare_version(), getenv('DYNARE_VERSION'))
   error('Incorrect version of Dynare is being tested')
 end
 
-try
-    % To add default directories
-    dynare('non_existant_mod_file.mod', 'console');
-catch
-end
+% To add default directories, empty dseries objects
+dynare_config
 
 disp('');
 disp(['***  TESTING: run_reporting_test_matlab.m ***']);
@@ -57,6 +54,6 @@ else
   fprintf(fid,':number-failed-tests: 0\n');
   fprintf(fid,':list-of-passed-tests: run_reporting_test_matlab.m\n');
 end
-fprintf(fid,':cputime: %f\n',0.0);
+fprintf(fid,':elapsed-time: %f\n',0.0);
 fclose(fid);
 exit;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015 Dynare Team
+ * Copyright (C) 2006-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -72,9 +72,6 @@ public:
   bool estimation_analytic_derivation;
   //! Whether the option partial_information is given to stoch_simul/estimation/osr/ramsey_policy
   bool partial_information;
-  //! Whether a histval bloc is present
-  /*! Used for the workaround for trac ticket #157 */
-  bool histval_present;
   //! Whether the "k_order_solver" option is used (explictly, or implicitly if order >= 3)
   bool k_order_solver;
   //! Whether there is a calibrated measurement error
@@ -116,19 +113,19 @@ public:
   bool corr_options_statement_present;
   //! Whether a Markov Switching DSGE is present
   bool ms_dsge_present;
-  //! Whether occbin is present
-  bool occbin_option;
   //! Stores the original number of equations in the model_block
   int orig_eq_nbr;
-   //! Stores the number of equations added to the Ramsey model
+  //! Stores the number of equations added to the Ramsey model
   int ramsey_eq_nbr;
-
+  //! Histval values that do not have the appropriate lag
+  map<int, int> hist_vals_wrong_lag;
 };
 
 class Statement
 {
 public:
-  virtual ~Statement();
+  virtual
+  ~Statement();
   //! Do some internal check, and fill the ModFileStructure class
   /*! Don't forget to update ComputingTasks.hh, Shocks.hh and
     NumericalInitialization.hh if you modify the signature of this

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2016 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -42,8 +42,8 @@ void main2(stringstream &in, string &basename, bool debug, bool clear_all, bool 
            WarningConsolidation &warnings_arg, bool nostrict, bool check_model_changes,
            bool minimal_workspace, bool compute_xrefs, FileOutputType output_mode,
            LanguageOutputType lang, int params_derivs_order
-#if defined(_WIN32) || defined(__CYGWIN32__)
-           , bool cygwin, bool msvc
+#if defined(_WIN32) || defined(__CYGWIN32__) || defined(__MINGW32__)
+           , bool cygwin, bool msvc, bool mingw
 #endif
            );
 
@@ -58,9 +58,10 @@ usage()
        << " [console] [nograph] [nointeractive] [parallel[=cluster_name]] [conffile=parallel_config_path_and_filename] [parallel_slave_open_mode] [parallel_test]"
        << " [-D<variable>[=<value>]] [-I/path] [nostrict] [fast] [minimal_workspace] [compute_xrefs] [output=dynamic|first|second|third] [language=C|C++|julia]"
        << " [params_derivs_order=0|1|2]"
-#if defined(_WIN32) || defined(__CYGWIN32__)
-       << " [cygwin] [msvc]"
+#if defined(_WIN32) || defined(__CYGWIN32__) || defined(__MINGW32__)
+       << " [cygwin] [msvc] [mingw]"
 #endif
+       << " [nopathchange]"
        << endl;
   exit(EXIT_FAILURE);
 }
@@ -96,9 +97,10 @@ main(int argc, char **argv)
   bool console = false;
   bool nograph = false;
   bool nointeractive = false;
-#if defined(_WIN32) || defined(__CYGWIN32__)
+#if defined(_WIN32) || defined(__CYGWIN32__) || defined(__MINGW32__)
   bool cygwin = false;
   bool msvc = false;
+  bool mingw = false;
 #endif
   string parallel_config_file;
   bool parallel = false;
@@ -123,8 +125,8 @@ main(int argc, char **argv)
         clear_all = false;
       else if (strlen(argv[arg]) >= 19 && !strncmp(argv[arg], "params_derivs_order", 19))
         {
-          if (strlen(argv[arg]) >= 22 || argv[arg][19] != '=' ||
-              !(argv[arg][20] == '0' || argv[arg][20] == '1' || argv[arg][20] == '2'))
+          if (strlen(argv[arg]) >= 22 || argv[arg][19] != '='
+              || !(argv[arg][20] == '0' || argv[arg][20] == '1' || argv[arg][20] == '2'))
             {
               cerr << "Incorrect syntax for params_derivs_order option" << endl;
               usage();
@@ -167,11 +169,13 @@ main(int argc, char **argv)
         nograph = true;
       else if (!strcmp(argv[arg], "nointeractive"))
         nointeractive = true;
-#if defined(_WIN32) || defined(__CYGWIN32__)
+#if defined(_WIN32) || defined(__CYGWIN32__) || defined(__MINGW32__)
       else if (!strcmp(argv[arg], "cygwin"))
         cygwin = true;
       else if (!strcmp(argv[arg], "msvc"))
         msvc = true;
+      else if (!strcmp(argv[arg], "mingw"))
+        mingw = true;
 #endif
       else if (strlen(argv[arg]) >= 8 && !strncmp(argv[arg], "conffile", 8))
         {
@@ -219,12 +223,12 @@ main(int argc, char **argv)
           size_t equal_index = string(argv[arg]).find('=');
           if (equal_index != string::npos)
             {
-              string key = string(argv[arg]).erase(equal_index).erase(0,2);
+              string key = string(argv[arg]).erase(equal_index).erase(0, 2);
               defines[key] = string(argv[arg]).erase(0, equal_index+1);
             }
           else
             {
-              string key = string(argv[arg]).erase(0,2);
+              string key = string(argv[arg]).erase(0, 2);
               defines[key] = "1";
             }
         }
@@ -236,36 +240,36 @@ main(int argc, char **argv)
                    << "must not be separated from -I by whitespace." << endl;
               usage();
             }
-          path.push_back(string(argv[arg]).erase(0,2));
+          path.push_back(string(argv[arg]).erase(0, 2));
         }
       else if (strlen(argv[arg]) >= 6 && !strncmp(argv[arg], "output", 6))
         {
-	  if (strlen(argv[arg]) <= 7 || argv[arg][6] != '=')
-	    {
-	      cerr << "Incorrect syntax for ouput option" << endl;
-	      usage();
-	    }
-	  if (strlen(argv[arg]) == 14 && !strncmp(argv[arg] + 7, "dynamic", 7))
-	    output_mode = dynamic;
-	  else if (strlen(argv[arg]) ==  12 && !strncmp(argv[arg] + 7, "first", 5))
-	    output_mode = first;
-	  else if (strlen(argv[arg]) == 13 && !strncmp(argv[arg] + 7, "second", 6))
-	    output_mode = second;
-	  else if (strlen(argv[arg]) == 12 && !strncmp(argv[arg] + 7, "third", 5))
-	    output_mode = third;
-	  else
-	    {
-	      cerr << "Incorrect syntax for ouput option" << endl;
-	      usage();
+          if (strlen(argv[arg]) <= 7 || argv[arg][6] != '=')
+            {
+              cerr << "Incorrect syntax for output option" << endl;
+              usage();
+            }
+          if (strlen(argv[arg]) == 14 && !strncmp(argv[arg] + 7, "dynamic", 7))
+            output_mode = dynamic;
+          else if (strlen(argv[arg]) ==  12 && !strncmp(argv[arg] + 7, "first", 5))
+            output_mode = first;
+          else if (strlen(argv[arg]) == 13 && !strncmp(argv[arg] + 7, "second", 6))
+            output_mode = second;
+          else if (strlen(argv[arg]) == 12 && !strncmp(argv[arg] + 7, "third", 5))
+            output_mode = third;
+          else
+            {
+              cerr << "Incorrect syntax for output option" << endl;
+              usage();
             }
         }
       else if (strlen(argv[arg]) >= 8 && !strncmp(argv[arg], "language", 8))
         {
-	  if (strlen(argv[arg]) <= 9 || argv[arg][8] != '=')
-	    {
-	      cerr << "Incorrect syntax for language option" << endl;
-	      usage();
-	    }
+          if (strlen(argv[arg]) <= 9 || argv[arg][8] != '=')
+            {
+              cerr << "Incorrect syntax for language option" << endl;
+              usage();
+            }
 
           if (strlen(argv[arg]) == 14 && !strncmp(argv[arg] + 9, "julia", 5))
             language = julia;
@@ -331,8 +335,8 @@ main(int argc, char **argv)
         no_tmp_terms, no_log, no_warn, warn_uninit, console, nograph, nointeractive,
         parallel, config_file, warnings, nostrict, check_model_changes, minimal_workspace,
         compute_xrefs, output_mode, language, params_derivs_order
-#if defined(_WIN32) || defined(__CYGWIN32__)
-        , cygwin, msvc
+#if defined(_WIN32) || defined(__CYGWIN32__) || defined(__MINGW32__)
+        , cygwin, msvc, mingw
 #endif
         );
 

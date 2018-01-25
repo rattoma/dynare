@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2016 Dynare Team
+ * Copyright (C) 2003-2017 Dynare Team
  *
  * This file is part of Dynare.
  *
@@ -30,9 +30,6 @@ using namespace std;
 class StaticModel : public ModelTree
 {
 private:
-  //! Temporary terms for the file containing parameters dervicatives
-  temporary_terms_t params_derivs_temporary_terms;
-
   //! global temporary terms for block decomposed models
   vector<vector<temporary_terms_t> > v_temporary_terms;
 
@@ -218,12 +215,14 @@ public:
     return (block_type_firstequation_size_mfs[block_number].second.first);
   };
   //! Return the number of exogenous variable in the block block_number
-  virtual unsigned int getBlockExoSize(int block_number) const
+  virtual unsigned int
+  getBlockExoSize(int block_number) const
   {
     return 0;
   };
   //! Return the number of colums in the jacobian matrix for exogenous variable in the block block_number
-  virtual unsigned int getBlockExoColSize(int block_number) const
+  virtual unsigned int
+  getBlockExoColSize(int block_number) const
   {
     return 0;
   }

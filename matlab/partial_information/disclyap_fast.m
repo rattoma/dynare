@@ -1,25 +1,25 @@
-function [X,exitflag]=disclyap_fast(G,V,tol,ch)
+function [X,exitflag]=disclyap_fast(G,V,tol,check_flag)
 % function X=disclyap_fast(G,V,ch)
 % Inputs:
-%   - G     [double]    first input matrix
-%   - V     [double]    second input matrix
-%   - tol   [scalar]    tolerance criterion 
-%   - ch    empty of non-empty             if non-empty: check positive-definiteness
+%   - G             [double]    first input matrix
+%   - V             [double]    second input matrix
+%   - tol           [scalar]    tolerance criterion
+%   - check_flag    empty of non-empty             if non-empty: check positive-definiteness
 % Outputs:
-%   - X     [double]    solution matrix
-%   - exitflag [scalar] 0 if solution is found, 1 otherwise
+%   - X             [double]    solution matrix
+%   - exitflag      [scalar]    0 if solution is found, 1 otherwise
 %
-% Solve the discrete Lyapunov Equation 
-% X=G*X*G'+V 
-% Using the Doubling Algorithm 
+% Solve the discrete Lyapunov Equation
+% X=G*X*G'+V
+% Using the Doubling Algorithm
 %
-% If ch is defined then the code will check if the resulting X 
-% is positive definite and generate an error message if it is not 
-% 
-% Joe Pearlman and Alejandro Justiniano 
-% 3/5/2005 
+% If check_flag is defined then the code will check if the resulting X
+% is positive definite and generate an error message if it is not
+%
+% Joe Pearlman and Alejandro Justiniano
+% 3/5/2005
 
-% Copyright (C) 2010-2015 Dynare Team
+% Copyright (C) 2010-2017 Dynare Team
 %
 % This file is part of Dynare.
 %
@@ -36,43 +36,40 @@ function [X,exitflag]=disclyap_fast(G,V,tol,ch)
 % You should have received a copy of the GNU General Public License
 % along with Dynare.  If not, see <http://www.gnu.org/licenses/>.
 
-if nargin <= 3 || isempty( ch ) == 1 
-    flag_ch = 0; 
-else 
-    flag_ch = 1; 
-end 
-s=size(G,1); 
+if nargin <= 3 || isempty( check_flag ) == 1
+    flag_ch = 0;
+else
+    flag_ch = 1;
+end
 exitflag=0;
 
-%tol = 1e-16; 
+P0=V;
+A0=G;
 
-P0=V; 
-A0=G; 
-
-matd=1; 
+matd=1;
 iter=1;
-while matd > tol && iter< 2000 
-    P1=P0+A0*P0*A0'; 
-    A1=A0*A0;  
-    matd=max( max( abs( P1 - P0 ) ) ); 
-    P0=P1; 
-    A0=A1; 
+while matd > tol && iter< 2000
+    P1=P0+A0*P0*A0';
+    A1=A0*A0;
+    matd=max( max( abs( P1 - P0 ) ) );
+    P0=P1;
+    A0=A1;
     iter=iter+1;
-end 
+end
 if iter==5000
     X=NaN(P0);
     exitflag=1;
     return
 end
-clear A0 A1 P1; 
+clear A0 A1 P1;
 
-X=(P0+P0')/2; 
+X=(P0+P0')/2;
 
-% Check that X is positive definite 
-if flag_ch==1 
-    [C,p]=chol(X); 
-    if p ~= 0 
+% Check that X is positive definite
+if flag_ch==1
+    [C,p]=chol(X);
+    if p ~= 0
         exitflag=1;
         error('X is not positive definite')
-    end 
-end 
+    end
+end

@@ -1,4 +1,4 @@
-## Copyright (C) 2009-2014 Dynare Team
+## Copyright (C) 2009-2017 Dynare Team
 ##
 ## This file is part of Dynare.
 ##
@@ -21,6 +21,8 @@
 ## 'wsOct', and reloaded after Dynare has finished (this is necessary since
 ## Dynare does a 'clear -all').
 
+load_octave_packages
+
 top_test_dir = getenv('TOP_TEST_DIR');
 addpath(top_test_dir);
 addpath([top_test_dir filesep '..' filesep 'matlab']);
@@ -41,7 +43,7 @@ cd(directory);
 
 printf("\n***  TESTING: %s ***\n", name);
 
-cput = cputime;
+tic;
 save(['wsOct' testfile '.mat']);
 try
   dynare([testfile ext])
@@ -54,7 +56,7 @@ top_test_dir = getenv('TOP_TEST_DIR');
 name = getenv("FILESTEM");
 [directory, testfile, ext] = fileparts([top_test_dir '/' name]);
 load(['wsOct' testfile '.mat']);
-ecput = cputime - cput;
+ecput = toc;
 delete(['wsOct' testfile '.mat']);
 
 cd(top_test_dir);
@@ -70,7 +72,7 @@ else
   fprintf(fid,':number-failed-tests: 0\n');
   fprintf(fid,':list-of-passed-tests: %s\n', [name '.mod']);
 end
-fprintf(fid,':cputime: %f\n', ecput);
+fprintf(fid,':elapsed-time: %f\n', ecput);
 fclose(fid);
 
 ## Local variables:
